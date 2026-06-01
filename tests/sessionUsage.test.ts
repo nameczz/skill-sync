@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -153,5 +153,56 @@ describe("session usage scanner", () => {
     });
 
     expect(result).toMatchObject({ recorded: 1, skillIds: ["baoyu-comic"] });
+  });
+
+  it("scans seven days of sessions on first initialization", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "csm-session-initial-window-"));
+    const codexHome = path.join(root, "codex-home");
+    const config = await createLocalConfig({
+      syncRepo: path.join(root, "repo"),
+      codexSkillsDir: path.join(root, "codex-skills"),
+      agentsSkillsDir: path.join(root, "agents-skills"),
+      cacheDir: path.join(root, "cache"),
+      env: { CSM_CONFIG_DIR: path.join(root, "config") } as NodeJS.ProcessEnv,
+      force: true
+    });
+    await ensureRepoMetadata(config.syncRepo);
+    await mkdir(path.join(config.codexSkillsDir, "baoyu-comic"), { recursive: true });
+    await writeFile(path.join(config.codexSkillsDir, "baoyu-comic", "SKILL.md"), "# baoyu-comic\n", "utf8");
+
+    const sessionsDir = path.join(codexHome, "sessions", "2026", "05", "22");
+    await mkdir(sessionsDir, { recursive: true });
+    const sixDaysOld = path.join(sessionsDir, "rollout-2026-05-22T12-00-00-six-days.jsonl");
+    const eightDaysOld = path.join(sessionsDir, "rollout-2026-05-20T12-00-00-eight-days.jsonl");
+    const sessionLine = (timestamp: string) =>
+      `${JSON.stringify({
+        timestamp,
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          arguments: JSON.stringify({
+            cmd: `sed -n '1,80p' ${config.codexSkillsDir}/baoyu-comic/SKILL.md`,
+            workdir: root
+          }),
+          call_id: "call_test"
+        }
+      })}\n`;
+
+    await writeFile(sixDaysOld, sessionLine("2026-05-22T05:00:00.000Z"), "utf8");
+    await writeFile(eightDaysOld, sessionLine("2026-05-20T05:00:00.000Z"), "utf8");
+    await utimes(sixDaysOld, new Date("2026-05-22T05:00:00.000Z"), new Date("2026-05-22T05:00:00.000Z"));
+    await utimes(eightDaysOld, new Date("2026-05-20T05:00:00.000Z"), new Date("2026-05-20T05:00:00.000Z"));
+
+    const result = await recordUsageFromCodexSessions(config, {
+      threadId: null,
+      env: { CODEX_HOME: codexHome } as NodeJS.ProcessEnv,
+      now: () => new Date("2026-05-28T05:00:00.000Z")
+    });
+
+    expect(result).toMatchObject({ scannedFiles: 1, recorded: 1, skillIds: ["baoyu-comic"] });
+    await expect(readUsageEvents(config.syncRepo)).resolves.toEqual([
+      { skillId: "baoyu-comic", invokedAt: "2026-05-22T05:00:00.000Z", source: "record" }
+    ]);
   });
 });

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -7,7 +7,8 @@ import {
   listCodexArchiveSessions,
   moveCodexArchiveSessionToTrash,
   previewCodexArchiveSession,
-  restoreCodexArchiveSession
+  restoreCodexArchiveSession,
+  unarchiveCodexArchiveSession
 } from "../src/codexArchive.js";
 
 describe("codex archive", () => {
@@ -44,6 +45,46 @@ describe("codex archive", () => {
     expect(existsSync(path.join(archiveRoot, ".trash", fileName))).toBe(false);
   });
 
+  it("unarchives sessions back to Codex sessions by rollout date", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "csm-codex-archive-unarchive-"));
+    const { archiveRoot, fileName, options } = await writeArchivedSession(root);
+
+    const result = await unarchiveCodexArchiveSession(fileName, options);
+
+    const codexHome = options.env.CODEX_HOME;
+    if (!codexHome) {
+      throw new Error("CODEX_HOME missing in test setup.");
+    }
+    const activeSessionPath = path.join(codexHome, "sessions", "2026", "05", "14", fileName);
+    expect(result.targetPath).toBe(await realpath(activeSessionPath));
+    expect(existsSync(path.join(archiveRoot, fileName))).toBe(false);
+    expect(existsSync(activeSessionPath)).toBe(true);
+    expect((await listCodexArchiveSessions("active", options)).items).toHaveLength(0);
+  });
+
+  it("lists newest archive sessions first by default", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "csm-codex-archive-sort-"));
+    const { archiveRoot, options } = await writeArchivedSession(root);
+    const newerSessionId = "019e6992-5483-7172-b538-ab47e49e440c";
+    const newerFileName = `rollout-2026-05-27T21-14-18-${newerSessionId}.jsonl`;
+    await writeFile(
+      path.join(archiveRoot, newerFileName),
+      `${JSON.stringify({ timestamp: "2026-05-27T13:14:18.000Z", type: "session_meta", payload: { id: newerSessionId } })}\n`,
+      "utf8"
+    );
+    await writeFile(
+      path.join(path.dirname(archiveRoot), "session_index.jsonl"),
+      [
+        JSON.stringify({ id: "019e24bb-2ac1-7ab3-b603-b5b3a2edcee8", thread_name: "Older thread", updated_at: "2026-05-14T04:27:00.000Z" }),
+        JSON.stringify({ id: newerSessionId, thread_name: "Newer thread", updated_at: "2026-05-27T13:14:19.000Z" })
+      ].join("\n"),
+      "utf8"
+    );
+
+    const list = await listCodexArchiveSessions("active", options);
+    expect(list.items.map((item) => item.title)).toEqual(["Newer thread", "Older thread"]);
+  });
+
   it("rejects path traversal and non-jsonl file names", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "csm-codex-archive-safe-"));
     const { options } = await writeArchivedSession(root);
@@ -51,6 +92,7 @@ describe("codex archive", () => {
     await expect(previewCodexArchiveSession("active", "../escape.jsonl", options)).rejects.toThrow("safe basename");
     await expect(previewCodexArchiveSession("active", "/tmp/escape.jsonl", options)).rejects.toThrow("safe basename");
     await expect(previewCodexArchiveSession("active", "escape.txt", options)).rejects.toThrow(".jsonl");
+    await expect(unarchiveCodexArchiveSession("../escape.jsonl", options)).rejects.toThrow("safe basename");
   });
 });
 

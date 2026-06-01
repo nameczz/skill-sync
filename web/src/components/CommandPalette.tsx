@@ -9,6 +9,7 @@ import {
   DialogPortal,
   DialogTitle
 } from "./ui/dialog";
+import type { TFunction } from "../i18n";
 
 export type CommandPaletteAction = {
   id: string;
@@ -23,10 +24,11 @@ export type CommandPaletteAction = {
 type CommandPaletteProps = {
   actions: CommandPaletteAction[];
   open: boolean;
+  t: TFunction;
   onOpenChange: (open: boolean) => void;
 };
 
-export function CommandPalette({ actions, open, onOpenChange }: CommandPaletteProps) {
+export function CommandPalette({ actions, open, t, onOpenChange }: CommandPaletteProps) {
   const groups = Array.from(new Set(actions.map((action) => action.group)));
 
   return (
@@ -36,18 +38,18 @@ export function CommandPalette({ actions, open, onOpenChange }: CommandPalettePr
         <DialogContent className="command-dialog" aria-labelledby="command-title" aria-describedby="command-description">
           <DialogHeader className="command-header">
             <div>
-              <DialogTitle id="command-title">Command palette</DialogTitle>
-              <DialogDescription id="command-description">Search navigation and common sync actions.</DialogDescription>
+              <DialogTitle id="command-title">{t("commandPalette")}</DialogTitle>
+              <DialogDescription id="command-description">{t("searchNavigationActions")}</DialogDescription>
             </div>
             <kbd>⌘K</kbd>
           </DialogHeader>
           <Command className="command-root" shouldFilter>
             <div className="command-input-row">
               <Search size={16} aria-hidden="true" />
-              <Command.Input autoFocus placeholder="Search commands" />
+              <Command.Input autoFocus placeholder={t("searchCommands")} />
             </div>
             <Command.List className="command-list">
-              <Command.Empty className="command-empty">No command found.</Command.Empty>
+              <Command.Empty className="command-empty">{t("noCommandFound")}</Command.Empty>
               {groups.map((group) => (
                 <Command.Group heading={group} key={group}>
                   {actions

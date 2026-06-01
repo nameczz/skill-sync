@@ -10,6 +10,7 @@ import {
   getDefaultCodexSkillsDir,
   getDefaultConfigDir,
   getDefaultSyncRepo,
+  getLegacyConfigDir,
   type PathOptions
 } from "./paths.js";
 import { readJsonFile, writeJsonFile } from "./json.js";
@@ -23,7 +24,7 @@ export type InitConfigOptions = PathOptions & {
 };
 
 export async function createLocalConfig(options: InitConfigOptions = {}): Promise<LocalConfig> {
-  const configDir = getDefaultConfigDir(options);
+  const configDir = resolveConfigDirForWrite(options);
   const now = new Date().toISOString();
   const filePath = configFilePath(configDir);
   const existing = existsSync(filePath) ? await loadLocalConfig(options) : null;
@@ -48,10 +49,10 @@ export async function createLocalConfig(options: InitConfigOptions = {}): Promis
 }
 
 export async function loadLocalConfig(options: PathOptions = {}): Promise<LocalConfig> {
-  const filePath = configFilePath(getDefaultConfigDir(options));
+  const filePath = resolveConfigFileForRead(options);
 
   if (!existsSync(filePath)) {
-    throw new Error(`No config found at ${filePath}. Run "skill-manager init" first.`);
+    throw new Error(`No config found at ${filePath}. Run "skill-sync init" first.`);
   }
 
   const config = await readJsonFile<LocalConfig>(filePath);
@@ -66,12 +67,46 @@ export async function loadLocalConfig(options: PathOptions = {}): Promise<LocalC
 }
 
 export async function tryLoadLocalConfig(options: PathOptions = {}): Promise<LocalConfig | null> {
-  const filePath = configFilePath(getDefaultConfigDir(options));
+  const filePath = resolveConfigFileForRead(options);
   if (!existsSync(filePath)) {
     return null;
   }
 
   return loadLocalConfig(options);
+}
+
+function resolveConfigDirForWrite(options: PathOptions = {}): string {
+  const primary = getDefaultConfigDir(options);
+  const legacy = getLegacyConfigDir(options);
+  const primaryFile = configFilePath(primary);
+
+  if (existsSync(primaryFile) || primary === legacy) {
+    return primary;
+  }
+
+  const env = options.env ?? process.env;
+  const hasExplicitConfigDir = Boolean(env.SKILL_SYNC_CONFIG_DIR || env.CSM_CONFIG_DIR);
+  if (!hasExplicitConfigDir && existsSync(configFilePath(legacy))) {
+    return legacy;
+  }
+
+  return primary;
+}
+
+function resolveConfigFileForRead(options: PathOptions = {}): string {
+  const primary = configFilePath(getDefaultConfigDir(options));
+  if (existsSync(primary)) {
+    return primary;
+  }
+
+  const legacy = configFilePath(getLegacyConfigDir(options));
+  const env = options.env ?? process.env;
+  const hasExplicitConfigDir = Boolean(env.SKILL_SYNC_CONFIG_DIR || env.CSM_CONFIG_DIR);
+  if (!hasExplicitConfigDir && legacy !== primary && existsSync(legacy)) {
+    return legacy;
+  }
+
+  return primary;
 }
 
 function resolveUserPath(input: string, options: InitConfigOptions): string {

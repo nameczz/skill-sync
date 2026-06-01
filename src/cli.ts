@@ -17,8 +17,8 @@ import { updateLocalSkill } from "./updateLocalSkill.js";
 const program = new Command();
 
 program
-  .name("skill-manager")
-  .description("Manage Codex skills with a Git-backed local sync repository.")
+  .name("skill-sync")
+  .description("Sync local AI agent skills with a Git-backed repository.")
   .version("0.1.0");
 
 program
@@ -38,7 +38,7 @@ program
       force: options.force
     });
 
-    console.log(`Initialized Codex Skill Manager`);
+    console.log(`Initialized Skill Sync`);
     console.log(`Sync repo: ${result.config.syncRepo}`);
     console.log(`Codex skills: ${result.config.codexSkillsDir}`);
     console.log(`Agents skills: ${result.config.agentsSkillsDir}`);
@@ -108,7 +108,7 @@ program
     }
 
     const server = await startServer({ host: options.host, port });
-    console.log(`Codex Skill Manager is running at ${server.url}`);
+    console.log(`Skill Sync is running at ${server.url}`);
     console.log("Press Ctrl+C to stop.");
   });
 

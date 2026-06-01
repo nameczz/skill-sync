@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   Archive,
+  ArchiveRestore,
   ArrowUpDown,
   Box,
   ChevronLeft,
@@ -15,6 +16,7 @@ import {
   FilePenLine,
   FolderGit2,
   HardDrive,
+  Languages,
   Layers3,
   GitCompareArrows,
   Loader2,
@@ -69,6 +71,7 @@ import {
 } from "./components/ui/dialog";
 import { CommandPalette, type CommandPaletteAction } from "./components/CommandPalette";
 import { SettingsPanel, PathInput, PathSummary, type SetupPathField, type SetupPaths } from "./components/SettingsPanel";
+import { documentLanguage, localeStorageKey, makeT, readInitialLocale, type Locale, type TFunction } from "./i18n";
 import { Input } from "./components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -142,7 +145,7 @@ export function App() {
   const [compareState, setCompareState] = useState<{ row: SkillRow; versions: SkillVersion[] } | null>(null);
   const [repoConflictState, setRepoConflictState] = useState<{ conflicts: RepoSkillConflict[]; selections: Record<string, RepoConflictSource> } | null>(null);
   const [skillSort, setSkillSort] = useState<SortState<SkillSortKey>>({ key: "name", direction: "asc" });
-  const [archiveSort, setArchiveSort] = useState<SortState<ArchiveSortKey>>({ key: "title", direction: "asc" });
+  const [archiveSort, setArchiveSort] = useState<SortState<ArchiveSortKey>>({ key: "updated_at", direction: "desc" });
   const [detailOpen, setDetailOpen] = useState(false);
   const [archiveDetailOpen, setArchiveDetailOpen] = useState(false);
   const [archiveState, setArchiveState] = useState<CodexArchiveState>("active");
@@ -162,8 +165,10 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() => readInitialTheme());
+  const [locale, setLocale] = useState<Locale>(() => readInitialLocale());
   const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const t = useMemo(() => makeT(locale), [locale]);
 
   const navigateView = useCallback((nextView: View, options: { replace?: boolean } = {}) => {
     setView(nextView);
@@ -191,7 +196,7 @@ export function App() {
       const payload = (await response.json()) as ApiStatus;
       setStatus(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load status.");
+      setError(errorMessage(err, t("unableToLoadStatus"), t));
     } finally {
       if (!options.silent) {
         setLoading(false);
@@ -210,9 +215,9 @@ export function App() {
         throw new Error(await readError(response));
       }
       const payload = (await response.json()) as CodexArchiveListResponse;
-      setArchiveSessionRows(payload.items.map((item) => ({ ...item, state: payload.state, sourceLabel: item.source || "Unknown" })));
+      setArchiveSessionRows(payload.items.map((item) => ({ ...item, state: payload.state, sourceLabel: item.source || t("unknown") })));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load Codex archive.");
+      setError(errorMessage(err, t("unableToLoadCodexArchive"), t));
     } finally {
       if (!options.silent) {
         setLoading(false);
@@ -233,6 +238,16 @@ export function App() {
       window.localStorage.setItem(themeStorageKey, theme);
     }
   }, [theme]);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = documentLanguage(locale);
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(localeStorageKey, locale);
+    }
+  }, [locale]);
 
   useEffect(() => {
     const openCommandPalette = (event: globalThis.KeyboardEvent) => {
@@ -297,9 +312,9 @@ export function App() {
     return archiveSessionRows.map((row) => ({
       ...row,
       state: archiveState,
-      sourceLabel: row.source || "Unknown"
+      sourceLabel: row.source || t("unknown")
     }));
-  }, [archiveSessionRows, archiveState]);
+  }, [archiveSessionRows, archiveState, t]);
   const configured = status?.configured === true;
   const activeView = configured ? view : "skills";
   const report = configured ? status.report : null;
@@ -442,7 +457,7 @@ export function App() {
     setError(null);
     setNotice(null);
     if (!setupPaths.syncRepo.trim()) {
-      setError("Choose a sync repository before initializing.");
+      setError(t("chooseFolderBeforeInitializing"));
       return;
     }
 
@@ -458,7 +473,7 @@ export function App() {
       }
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Initialization failed.");
+      setError(errorMessage(err, t("initializationFailed"), t));
     } finally {
       setBusyId(null);
     }
@@ -480,7 +495,7 @@ export function App() {
       const payload = (await response.json()) as Extract<ApiStatus, { configured: true }>;
       setStatus(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save settings.");
+      setError(errorMessage(err, t("unableToSaveSettings"), t));
     } finally {
       setBusyId(null);
     }
@@ -517,7 +532,7 @@ export function App() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Directory selection failed.");
+      setError(errorMessage(err, t("directorySelectionFailed"), t));
     } finally {
       setSelectingPath(null);
     }
@@ -548,10 +563,10 @@ export function App() {
       const payload = (await response.json()) as { result?: SyncResult; dependencyInstall?: DependencyInstallInfo };
       const messages: string[] = [];
       if (payload.result) {
-        messages.push(syncResultMessage(payload.result));
+        messages.push(syncResultMessage(payload.result, t));
       }
       if (payload.dependencyInstall) {
-        const dependencyMessage = dependencyInstallMessage(payload.dependencyInstall);
+        const dependencyMessage = dependencyInstallMessage(payload.dependencyInstall, t);
         if (dependencyMessage) {
           messages.push(dependencyMessage);
         }
@@ -563,7 +578,7 @@ export function App() {
       setSelectedRowKey(endpoint === "import" ? `managed:${row.id}` : rowKey(row));
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${endpoint} failed.`);
+      setError(errorMessage(err, t("skillActionFailed", { action: skillActionFailureLabel(endpoint, t) }), t));
       return false;
     } finally {
       setBusyId(null);
@@ -600,14 +615,14 @@ export function App() {
       setArchiveDetailOpen(true);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load archived session preview.");
+      setError(errorMessage(err, t("unableToLoadArchivedSessionPreview"), t));
       return false;
     } finally {
       setBusyId(null);
     }
   }
 
-  async function runArchiveSessionAction(action: "delete" | "restore", row: CodexArchiveRow) {
+  async function runArchiveSessionAction(action: "delete" | "restore" | "unarchive", row: CodexArchiveRow) {
     const busyKey = `archive-${action}:${archiveRowKey(row)}`;
     setError(null);
     setNotice(null);
@@ -622,13 +637,19 @@ export function App() {
         throw new Error(await readError(response));
       }
 
-      setNotice(action === "delete" ? `Moved ${row.title} to archive trash.` : `Restored ${row.title} to active archive.`);
+      const messages = {
+        delete: t("movedToTrash", { title: row.title }),
+        restore: t("restoredToArchive", { title: row.title }),
+        unarchive: t("unarchivedToSessions", { title: row.title })
+      };
+      setNotice(messages[action]);
       setArchiveSession(null);
       setArchiveDetailOpen(false);
       await loadCodexArchiveSessions({ silent: true });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${action === "delete" ? "Delete" : "Restore"} archived session failed.`);
+      const fallback = action === "delete" ? t("deleteAction") : action === "restore" ? t("restoreAction") : t("unarchiveAction");
+      setError(errorMessage(err, t("deleteArchivedFailed", { action: fallback }), t));
       return false;
     } finally {
       setBusyId(null);
@@ -658,11 +679,11 @@ export function App() {
       const payload = await requestBulkAction(endpoint, targetRows);
       const messages: string[] = [];
       if (payload.result) {
-        messages.push(syncResultMessage(payload.result));
+        messages.push(syncResultMessage(payload.result, t));
       }
       const installedDependencyCount = payload.dependencyInstalls?.filter((install) => install.status === "installed").length ?? 0;
       if (installedDependencyCount > 0) {
-        messages.push(`Installed dependencies for ${installedDependencyCount} skill${installedDependencyCount === 1 ? "" : "s"}.`);
+        messages.push(t("installedDependenciesForSkills", { count: installedDependencyCount, plural: installedDependencyCount === 1 ? "" : "s" }));
       }
       if (messages.length > 0) {
         setNotice(messages.join(" "));
@@ -671,7 +692,7 @@ export function App() {
       setCheckedRowKeys((current) => current.filter((key) => !completedKeys.has(key)));
       await refresh({ silent: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bulk action failed.");
+      setError(errorMessage(err, t("bulkActionFailed"), t));
     } finally {
       setBusyId(null);
     }
@@ -692,7 +713,7 @@ export function App() {
       if (repoInstallRows.length > 0) {
         const payload = await requestBulkAction("install", repoInstallRows);
         if (payload.result) {
-          messages.push(syncResultMessage(payload.result));
+          messages.push(syncResultMessage(payload.result, t));
         }
         installedDependencyCount += payload.dependencyInstalls?.filter((install) => install.status === "installed").length ?? 0;
       }
@@ -700,19 +721,19 @@ export function App() {
       if (repoUpdateRows.length > 0) {
         const payload = await requestBulkAction("update-local", repoUpdateRows);
         if (payload.result) {
-          messages.push(syncResultMessage(payload.result));
+          messages.push(syncResultMessage(payload.result, t));
         }
         installedDependencyCount += payload.dependencyInstalls?.filter((install) => install.status === "installed").length ?? 0;
       }
 
       if (installedDependencyCount > 0) {
-        messages.push(`Installed dependencies for ${installedDependencyCount} skill${installedDependencyCount === 1 ? "" : "s"}.`);
+        messages.push(t("installedDependenciesForSkills", { count: installedDependencyCount, plural: installedDependencyCount === 1 ? "" : "s" }));
       }
 
-      setNotice(messages.length > 0 ? messages.join(" ") : "Applied repository changes to local skills.");
+      setNotice(messages.length > 0 ? messages.join(" ") : t("appliedRepositoryChangesToLocalSkills"));
       await refresh({ silent: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Apply repo changes failed.");
+      setError(errorMessage(err, t("applyRepoChangesFailed"), t));
     } finally {
       setBusyId(null);
     }
@@ -744,15 +765,15 @@ export function App() {
       }
 
       await refresh({ silent: true });
-      setNotice("Pulled latest changes from sync repository.");
+      setNotice(t("pulledLatestChanges"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Pull failed.";
+      const message = err instanceof Error ? err.message : t("pullFailed");
       if (message.includes("Cannot auto-resolve sync conflict") || message.includes("Review these paths manually")) {
         setBusyId(null);
         await openRepoConflicts();
         return;
       }
-      setError(message);
+      setError(errorMessage(err, t("pullFailed"), t));
     } finally {
       setBusyId(null);
     }
@@ -770,7 +791,7 @@ export function App() {
 
       const payload = (await response.json()) as RepoConflictsResponse;
       if (payload.conflicts.length === 0) {
-        setNotice("No skill-level repo conflicts need review.");
+        setNotice(t("noSkillRepoConflictsNeedReview"));
         await refresh({ silent: true });
         return;
       }
@@ -781,7 +802,7 @@ export function App() {
       }
       setRepoConflictState({ conflicts: payload.conflicts, selections });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load repo conflicts.");
+      setError(errorMessage(err, t("unableToLoadRepoConflicts"), t));
     } finally {
       setBusyId(null);
     }
@@ -812,9 +833,9 @@ export function App() {
 
       setRepoConflictState(null);
       await refresh({ silent: true });
-      setNotice("Resolved repo skill conflicts and pushed the merge.");
+      setNotice(t("resolvedRepoSkillConflictsPushed"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to resolve repo conflicts.");
+      setError(errorMessage(err, t("unableToResolveRepoConflicts"), t));
     } finally {
       setBusyId(null);
     }
@@ -870,7 +891,7 @@ export function App() {
       setDetailOpen(false);
       setEditorState({ rowKey: key, source, path: payload.path, content: payload.content, dirty: false });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to open SKILL.md.");
+      setError(errorMessage(err, t("unableToOpenSkillMd"), t));
     } finally {
       setBusyId(null);
     }
@@ -899,7 +920,7 @@ export function App() {
       await refresh({ silent: true });
       setSelectedRowKey(key);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save SKILL.md.");
+      setError(errorMessage(err, t("unableToSaveSkillMd"), t));
     } finally {
       setBusyId(null);
     }
@@ -923,7 +944,7 @@ export function App() {
       const payload = (await response.json()) as SkillVersionsResponse;
       setCompareState({ row, versions: payload.versions });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load version snapshot.");
+      setError(errorMessage(err, t("unableToLoadVersionSnapshot"), t));
     } finally {
       setBusyId(null);
     }
@@ -957,15 +978,15 @@ export function App() {
 
       const payload = (await response.json()) as ResolveConflictResult;
       if (payload.result) {
-        setNotice(syncResultMessage(payload.result));
+        setNotice(syncResultMessage(payload.result, t));
       } else {
-        setNotice(`Resolved ${targetRow.name || targetRow.id} with ${strategy} copy.`);
+        setNotice(t("resolvedWithCopy", { name: targetRow.name || targetRow.id, strategy }));
       }
       setCompareState(null);
       await refresh({ silent: true });
       setSelectedRowKey(key);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Conflict resolution failed.");
+      setError(errorMessage(err, t("conflictResolutionFailed"), t));
     } finally {
       setBusyId(null);
     }
@@ -996,92 +1017,107 @@ export function App() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }, []);
 
+  const toggleLocale = useCallback(() => {
+    setLocale((current) => (current === "zh" ? "en" : "zh"));
+  }, []);
+
   const commandActions = useMemo<CommandPaletteAction[]>(
     () => [
       {
         id: "go-skills",
-        label: "Go to Skills",
-        description: "Open skill sync table",
-        group: "Navigation",
+        label: t("goToSkills"),
+        description: t("openSkillSyncTable"),
+        group: t("navigation"),
         keywords: ["skill", "sync"],
         onSelect: () => navigateView("skills")
       },
       {
         id: "go-archive",
-        label: "Go to Codex Archive",
-        description: "Review archived Codex sessions",
-        group: "Navigation",
+        label: t("goToCodexArchive"),
+        description: t("reviewArchivedCodexSessions"),
+        group: t("navigation"),
         disabled: !configured,
         keywords: ["archive", "session"],
         onSelect: () => navigateView("archive")
       },
       {
         id: "go-settings",
-        label: "Go to Settings",
-        description: "Change local paths",
-        group: "Navigation",
+        label: t("goToSettings"),
+        description: t("changeLocalPaths"),
+        group: t("navigation"),
         disabled: !configured,
         keywords: ["paths", "config"],
         onSelect: () => navigateView("settings")
       },
       {
         id: "refresh",
-        label: "Refresh",
-        description: "Reload local status",
-        group: "Actions",
+        label: t("refresh"),
+        description: t("reloadLocalStatus"),
+        group: t("actions"),
         disabled: busyId !== null,
         onSelect: () => void refresh()
       },
       {
         id: "pull",
-        label: "Pull remote changes",
-        description: "Fetch and apply Git repo updates",
-        group: "Actions",
+        label: t("pullRemoteChanges"),
+        description: t("fetchApplyGitUpdates"),
+        group: t("actions"),
         disabled: !configured || activeView !== "skills" || busyId !== null,
         keywords: ["git", "remote"],
         onSelect: () => void pullFromRemote()
       },
       {
         id: "apply-repo",
-        label: "Apply repo changes",
-        description: repoApplyCount > 0 ? `${repoApplyCount} local install/update action${repoApplyCount === 1 ? "" : "s"}` : "No repo changes to apply",
-        group: "Actions",
+        label: t("applyRepoChanges"),
+        description:
+          repoApplyCount > 0
+            ? t("applyLocalActionCount", { count: repoApplyCount, plural: repoApplyCount === 1 ? "" : "s" })
+            : t("noRepoChangesApply"),
+        group: t("actions"),
         disabled: !configured || activeView !== "skills" || busyId !== null || repoApplyCount === 0,
         keywords: ["install", "update"],
         onSelect: () => void applyRepoChangesToLocal()
       },
       {
         id: "toggle-theme",
-        label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
-        description: "Toggle interface theme",
-        group: "Actions",
+        label: theme === "dark" ? t("switchToLight") : t("switchToDark"),
+        description: t("toggleInterfaceTheme"),
+        group: t("actions"),
         keywords: ["dark", "light"],
         onSelect: toggleTheme
       },
       {
+        id: "toggle-language",
+        label: t("switchLanguage"),
+        description: locale === "zh" ? "English" : "中文",
+        group: t("actions"),
+        keywords: ["language", "中文", "english"],
+        onSelect: toggleLocale
+      },
+      {
         id: "clear-search",
-        label: "Clear search",
-        description: query ? "Clear the current search query" : "Search is already empty",
-        group: "Actions",
+        label: t("clearSearch"),
+        description: query ? t("clearSearchDescription") : t("searchAlreadyEmpty"),
+        group: t("actions"),
         disabled: query.length === 0,
         keywords: ["filter"],
         onSelect: () => setQuery("")
       }
     ],
-    [activeView, busyId, configured, navigateView, query, repoApplyCount, theme, toggleTheme]
+    [activeView, busyId, configured, locale, navigateView, query, repoApplyCount, t, theme, toggleLocale, toggleTheme]
   );
 
   return (
     <div className={sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"} data-theme={theme}>
-      <CommandPalette actions={commandActions} open={commandOpen} onOpenChange={setCommandOpen} />
-      <aside className="sidebar" aria-label="Primary navigation">
+      <CommandPalette actions={commandActions} open={commandOpen} t={t} onOpenChange={setCommandOpen} />
+      <aside className="sidebar" aria-label={t("primaryNavigation")}>
         <div className="brand">
           <div className="brand-mark">
             <Layers3 size={18} aria-hidden="true" />
           </div>
           <div>
-            <strong>Skill Manager</strong>
-            <span>Local sync workbench</span>
+            <strong>{t("appName")}</strong>
+            <span>{t("appSubtitle")}</span>
           </div>
           <Button
             className="sidebar-toggle"
@@ -1089,8 +1125,8 @@ export function App() {
             size="icon"
             type="button"
             onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={sidebarCollapsed ? t("expandSidebar") : t("collapseSidebar")}
+            title={sidebarCollapsed ? t("expandSidebar") : t("collapseSidebar")}
           >
             {sidebarCollapsed ? <PanelLeftOpen size={15} aria-hidden="true" /> : <PanelLeftClose size={15} aria-hidden="true" />}
           </Button>
@@ -1105,7 +1141,7 @@ export function App() {
             onClick={() => navigateView("skills")}
           >
             <Box size={16} aria-hidden="true" />
-            Skills
+            {t("skills")}
           </Button>
           <Button
             className={configured && activeView === "archive" ? "nav-item active" : configured ? "nav-item" : "nav-item disabled"}
@@ -1120,7 +1156,7 @@ export function App() {
             disabled={!configured}
           >
             <Archive size={16} aria-hidden="true" />
-            Codex Archive
+            {t("codexArchive")}
           </Button>
           <Button
             className={configured && activeView === "settings" ? "nav-item active" : configured ? "nav-item" : "nav-item disabled"}
@@ -1135,8 +1171,8 @@ export function App() {
             disabled={!configured}
           >
             <Settings size={16} aria-hidden="true" />
-            Settings
-            {!configured ? <span>Planned</span> : null}
+            {t("settings")}
+            {!configured ? <span>{t("planned")}</span> : null}
           </Button>
         </nav>
       </aside>
@@ -1144,8 +1180,8 @@ export function App() {
       <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Codex Skill Manager</p>
-            <h1>{viewTitle(activeView)}</h1>
+            <p className="eyebrow">{t("productName")}</p>
+            <h1>{viewTitle(activeView, t)}</h1>
           </div>
           <div className="topbar-actions">
             <Button
@@ -1154,19 +1190,31 @@ export function App() {
               size="sm"
               type="button"
               onClick={toggleTheme}
-              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={theme === "dark" ? t("switchToLight") : t("switchToDark")}
+              title={theme === "dark" ? t("switchToLight") : t("switchToDark")}
             >
               {theme === "dark" ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
-              {theme === "dark" ? "Light" : "Dark"}
+              {theme === "dark" ? t("light") : t("dark")}
+            </Button>
+            <Button
+              className="language-toggle"
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={toggleLocale}
+              aria-label={t("switchLanguage")}
+              title={t("switchLanguage")}
+            >
+              <Languages size={15} aria-hidden="true" />
+              {locale === "zh" ? "EN" : "中文"}
             </Button>
             <Button variant="secondary" size="sm" type="button" onClick={() => void refresh()}>
               <RefreshCw size={15} aria-hidden="true" />
-              Refresh
+              {t("refresh")}
             </Button>
-            <Button variant="secondary" size="sm" type="button" onClick={() => setCommandOpen(true)} title="Command palette (⌘K)">
+            <Button variant="secondary" size="sm" type="button" onClick={() => setCommandOpen(true)} title={t("commandPaletteShortcut")}>
               <Search size={15} aria-hidden="true" />
-              Command
+              {t("command")}
             </Button>
             <Button
               variant="secondary"
@@ -1176,9 +1224,9 @@ export function App() {
               disabled={!configured || activeView !== "skills" || busyId !== null}
             >
               {busyId === "pull" ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <CloudDownload size={15} aria-hidden="true" />}
-              Pull
+              {t("pull")}
             </Button>
-            {autoSyncStatus ? <AutoSyncIndicator status={autoSyncStatus} /> : null}
+            {autoSyncStatus ? <AutoSyncIndicator status={autoSyncStatus} t={t} /> : null}
           </div>
         </header>
 
@@ -1200,29 +1248,27 @@ export function App() {
           <section className="setup-panel" aria-labelledby="setup-title">
             <Card className="setup-copy">
               <CardHeader>
-                <p className="eyebrow">Setup required</p>
-                <CardTitle id="setup-title">Initialize a local sync repository</CardTitle>
-                <CardDescription>
-                  Choose the Git-backed sync repository for your skills. Codex will still read installed skills from
-                  its local runtime folder, and cache stays outside Git by default.
-                </CardDescription>
+                <p className="eyebrow">{t("setupRequired")}</p>
+                <CardTitle id="setup-title">{t("initializeLocalRepo")}</CardTitle>
+                <CardDescription>{t("setupDescription")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="setup-fields">
                   <PathInput
                     id="setup-root-path"
-                    label="Sync repository directory"
+                    label={t("syncRepositoryDirectory")}
                     value={setupRoot}
                     onChange={updateSetupRoot}
-                    onChoose={() => void chooseDirectory("setupRoot", "Choose a sync repository directory")}
+                    onChoose={() => void chooseDirectory("setupRoot", t("chooseSyncRepositoryDirectory"))}
                     choosing={selectingPath === "setupRoot"}
-                    placeholder="Choose a folder before initializing"
+                    placeholder={t("chooseFolderBeforeInitializing")}
+                    chooseLabel={t("choose")}
                   />
-                  <div className="setup-derived" aria-label="Derived setup paths">
-                    <PathSummary label="Will be committed" value={setupPaths.syncRepo || "Not selected"} />
-                    <PathSummary label="Codex skills" value={setupPaths.codexSkillsDir} />
-                    <PathSummary label="Agents skills" value={setupPaths.agentsSkillsDir} />
-                    <PathSummary label="Local cache" value={setupPaths.cacheDir} />
+                  <div className="setup-derived" aria-label={t("derivedSetupPaths")}>
+                    <PathSummary label={t("willBeCommitted")} value={setupPaths.syncRepo || t("notYet")} />
+                    <PathSummary label={t("codexSkills")} value={setupPaths.codexSkillsDir} />
+                    <PathSummary label={t("agentsSkills")} value={setupPaths.agentsSkillsDir} />
+                    <PathSummary label={t("localCache")} value={setupPaths.cacheDir} />
                   </div>
                   <Button
                     variant="ghost"
@@ -1231,54 +1277,57 @@ export function App() {
                     aria-expanded={advancedPathsOpen}
                     onClick={() => setAdvancedPathsOpen((open) => !open)}
                   >
-                    {advancedPathsOpen ? "Hide advanced paths" : "Advanced paths"}
+                    {advancedPathsOpen ? t("hideAdvancedPaths") : t("advancedPaths")}
                   </Button>
                   {advancedPathsOpen ? (
                     <div className="advanced-paths">
                       <PathInput
                         id="sync-repo-path"
-                        label="Git sync repository"
+                        label={t("gitSyncRepository")}
                         value={setupPaths.syncRepo}
                         onChange={(value) => setSetupPaths((current) => ({ ...current, syncRepo: value }))}
-                        onChoose={() => void chooseDirectory("syncRepo", "Choose a sync repository directory")}
+                        onChoose={() => void chooseDirectory("syncRepo", t("chooseSyncRepositoryDirectory"))}
                         choosing={selectingPath === "syncRepo"}
+                        chooseLabel={t("choose")}
                       />
                       <PathInput
                         id="codex-skills-path"
-                        label="Codex skills directory"
+                        label={t("codexSkillsDirectory")}
                         value={setupPaths.codexSkillsDir}
                         onChange={(value) => setSetupPaths((current) => ({ ...current, codexSkillsDir: value }))}
-                        onChoose={() => void chooseDirectory("codexSkillsDir", "Choose a Codex skills directory")}
+                        onChoose={() => void chooseDirectory("codexSkillsDir", t("codexSkillsDirectory"))}
                         choosing={selectingPath === "codexSkillsDir"}
+                        chooseLabel={t("choose")}
                       />
                       <PathInput
                         id="agents-skills-path"
-                        label="Agents skills directory"
+                        label={t("agentsSkillsDirectory")}
                         value={setupPaths.agentsSkillsDir}
                         onChange={(value) => setSetupPaths((current) => ({ ...current, agentsSkillsDir: value }))}
-                        onChoose={() => void chooseDirectory("agentsSkillsDir", "Choose an Agents skills directory")}
+                        onChoose={() => void chooseDirectory("agentsSkillsDir", t("agentsSkillsDirectory"))}
                         choosing={selectingPath === "agentsSkillsDir"}
+                        chooseLabel={t("choose")}
                       />
                       <PathInput
                         id="cache-path"
-                        label="Local cache directory"
+                        label={t("localCacheDirectory")}
                         value={setupPaths.cacheDir}
                         onChange={(value) => setSetupPaths((current) => ({ ...current, cacheDir: value }))}
-                        onChoose={() => void chooseDirectory("cacheDir", "Choose a local cache directory")}
+                        onChoose={() => void chooseDirectory("cacheDir", t("localCacheDirectory"))}
                         choosing={selectingPath === "cacheDir"}
+                        chooseLabel={t("choose")}
                       />
                     </div>
                   ) : null}
                   <p className="setup-note">
-                    Choose a sync repository to enable Initialize. Advanced paths are for non-default Codex installs and
-                    testing.
+                    {t("setupNote")}
                   </p>
                 </div>
               </CardContent>
             </Card>
             <Button variant="primary" type="button" onClick={() => void initialize()} disabled={busyId === "init" || !setupRepoSelected}>
               {busyId === "init" ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <FolderGit2 size={15} aria-hidden="true" />}
-              Initialize
+              {t("initialize")}
             </Button>
           </section>
         ) : null}
@@ -1288,6 +1337,7 @@ export function App() {
             paths={setupPaths}
             busyId={busyId}
             selectingPath={selectingPath}
+            t={t}
             onPathChange={(field, value) => setSetupPaths((current) => ({ ...current, [field]: value }))}
             onChoose={(field, title) => void chooseDirectory(field, title)}
             onSave={() => void saveSettings()}
@@ -1296,21 +1346,22 @@ export function App() {
 
         {configured && activeView === "skills" ? (
           <Card className="skill-panel">
-            <section className="repo-strip" aria-label="Repository status">
-              <StatusTile label="Managed" value={String(report?.managed.length ?? 0)} />
-              <StatusTile label="Clean" value={String(cleanCount)} tone="good" />
-              <StatusTile label="Review" value={String(reviewCount)} tone={reviewCount > 0 ? "risk" : "neutral"} />
+            <section className="repo-strip" aria-label={t("repositoryStatus")}>
+              <StatusTile label={t("managed")} value={String(report?.managed.length ?? 0)} />
+              <StatusTile label={t("clean")} value={String(cleanCount)} tone="good" />
+              <StatusTile label={t("review")} value={String(reviewCount)} tone={reviewCount > 0 ? "risk" : "neutral"} />
               <div className="path-stack">
                 <div className="path-stack-lines">
-                  <PathLine icon={<FolderGit2 size={14} aria-hidden="true" />} label="Sync repo" value={report?.syncRepo ?? ""} />
-                  <PathLine icon={<HardDrive size={14} aria-hidden="true" />} label="Codex skills" value={report?.codexSkillsDir ?? ""} />
-                  <PathLine icon={<HardDrive size={14} aria-hidden="true" />} label="Agents skills" value={report?.agentsSkillsDir ?? ""} />
+                  <PathLine icon={<FolderGit2 size={14} aria-hidden="true" />} label={t("syncRepo")} value={report?.syncRepo ?? ""} />
+                  <PathLine icon={<HardDrive size={14} aria-hidden="true" />} label={t("codexSkills")} value={report?.codexSkillsDir ?? ""} />
+                  <PathLine icon={<HardDrive size={14} aria-hidden="true" />} label={t("agentsSkills")} value={report?.agentsSkillsDir ?? ""} />
                 </div>
                 <div className="path-stack-controls">
                   <BranchSyncBadge
                     status={status.gitBranchStatus}
-                    busy={busyId === "repo-conflicts"}
-                    onReview={status.gitBranchStatus.state === "diverged" ? () => void openRepoConflicts() : undefined}
+                    t={t}
+                    busy={busyId === "repo-conflicts" || busyId === "pull"}
+                    onReview={status.gitBranchStatus.state === "diverged" ? () => void pullFromRemote() : undefined}
                   />
                   <Button
                     className="path-stack-action"
@@ -1319,74 +1370,70 @@ export function App() {
                     type="button"
                     onClick={() => void applyRepoChangesToLocal()}
                     disabled={!configured || activeView !== "skills" || busyId !== null || repoApplyCount === 0}
-                    title={
-                      repoApplyCount === 0
-                        ? "No repo changes to apply locally"
-                        : `Install ${repoInstallRows.length} missing and update ${repoUpdateRows.length} changed local copies`
-                    }
+                    title={repoApplyCount === 0 ? t("noRepoChangesToApply") : t("applyRepoChangesTitle", { install: repoInstallRows.length, update: repoUpdateRows.length })}
                   >
                     {busyId === "apply-repo" ? <Loader2 className="spin" size={14} aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}
-                    Apply repo changes{repoApplyCount > 0 ? ` (${repoApplyCount})` : ""}
+                    {t("applyRepoChanges")}{repoApplyCount > 0 ? ` (${repoApplyCount})` : ""}
                   </Button>
                   <Button className="path-stack-action" variant="secondary" size="sm" type="button" onClick={() => navigateView("settings")}>
                     <Settings size={14} aria-hidden="true" />
-                    Change paths
+                    {t("changePaths")}
                   </Button>
                 </div>
               </div>
             </section>
 
-            <section className="skills-summary-strip" aria-label="Sync and usage summary">
+            <section className="skills-summary-strip" aria-label={t("syncUsageSummary")}>
               <SummaryAction
                 icon={<Download size={15} aria-hidden="true" />}
-                label="Repo changes"
+                label={t("repoChanges")}
                 value={String(repoApplyCount)}
-                detail={`${repoInstallRows.length} install, ${repoUpdateRows.length} update`}
+                detail={t("installUpdateDetail", { install: repoInstallRows.length, update: repoUpdateRows.length })}
                 disabled={repoApplyCount === 0}
                 onClick={() => setFilter(repoInstallRows.length > 0 ? "missing_local" : "repo_modified")}
               />
               <SummaryAction
                 icon={<RefreshCw size={15} aria-hidden="true" />}
-                label="Local changes"
+                label={t("localChanges")}
                 value={String(localChangeRows.length + unmanagedRows.length)}
-                detail={`${localChangeRows.length} tracked, ${unmanagedRows.length} local only`}
+                detail={t("trackedLocalOnlyDetail", { tracked: localChangeRows.length, localOnly: unmanagedRows.length })}
                 disabled={localChangeRows.length + unmanagedRows.length === 0}
                 onClick={() => setFilter(localChangeRows.length > 0 ? "local_modified" : "unmanaged")}
               />
               <SummaryAction
                 icon={<ShieldAlert size={15} aria-hidden="true" />}
-                label="Conflicts"
+                label={t("conflicts")}
                 value={String(conflictRows.length)}
-                detail="Compare and accept a copy"
+                detail={t("compareAcceptCopy")}
                 tone={conflictRows.length > 0 ? "risk" : "neutral"}
                 disabled={conflictRows.length === 0}
                 onClick={() => setFilter("conflict")}
               />
-              <UsageTraceStatus status={status.usageMonitor} />
+              <UsageTraceStatus status={status.usageMonitor} t={t} locale={locale} />
             </section>
 
-            <section className="toolbar" aria-label="Skill filters">
+            <section className="toolbar" aria-label={t("skillFilters")}>
               <label className="search-box">
                 <Search size={16} aria-hidden="true" />
-                <span className="sr-only">Search skills</span>
+                <span className="sr-only">{t("searchSkills")}</span>
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search skills"
+                  placeholder={t("searchSkills")}
                   autoComplete="off"
                 />
               </label>
 
               <label className="filter-select">
-                <span>State</span>
+                <span>{t("state")}</span>
                 <Select value={filter} onValueChange={(value) => setFilter(value as Filter)}>
-                  <SelectTrigger aria-label="Filter by state">
+                  <SelectTrigger aria-label={t("filterByState")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {filters.map((item) => (
                       <SelectItem key={item} value={item}>
-                        {filterLabel(item)}
+                        {filterLabel(item, t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1395,10 +1442,10 @@ export function App() {
             </section>
 
             {checkedRowKeys.length > 0 ? (
-              <section className="bulk-bar" aria-label="Bulk actions">
+              <section className="bulk-bar" aria-label={t("bulkActions")}>
                 <div className="bulk-summary">
                   <strong>{selectedRows.length}</strong>
-                  <span>{selectedRows.length === 1 ? "skill selected" : "skills selected"}</span>
+                  <span>{selectedRows.length === 1 ? t("skillSelected") : t("skillsSelected")}</span>
                 </div>
                 <Button
                   className="button secondary"
@@ -1407,7 +1454,7 @@ export function App() {
                   disabled={busyId !== null || importableSelectedRows.length === 0}
                 >
                   {busyId === "bulk:import" ? <Loader2 className="spin" size={14} aria-hidden="true" /> : <PlusCircle size={14} aria-hidden="true" />}
-                  Add to sync ({importableSelectedRows.length})
+                  {t("addToSync")} ({importableSelectedRows.length})
                 </Button>
                 <Button
                   className="button secondary"
@@ -1416,7 +1463,7 @@ export function App() {
                   disabled={busyId !== null || installableSelectedRows.length === 0}
                 >
                   {busyId === "bulk:install" ? <Loader2 className="spin" size={14} aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}
-                  Install local ({installableSelectedRows.length})
+                  {t("installLocal")} ({installableSelectedRows.length})
                 </Button>
                 <Button
                   className="button secondary"
@@ -1429,17 +1476,17 @@ export function App() {
                   ) : (
                     <Download size={14} aria-hidden="true" />
                   )}
-                  Update local ({updatableSelectedRows.length})
+                  {t("updateLocal")} ({updatableSelectedRows.length})
                 </Button>
                 <Button className="button ghost" variant="ghost" size="sm" type="button" onClick={() => setCheckedRowKeys([])} disabled={busyId !== null}>
                   <X size={14} aria-hidden="true" />
-                  Clear
+                  {t("clear")}
                 </Button>
-                <span className="bulk-note">Only supported actions are enabled.</span>
+                <span className="bulk-note">{t("supportedActionsEnabled")}</span>
               </section>
             ) : null}
 
-            <section className="skill-list" aria-label="Skills">
+            <section className="skill-list" aria-label={t("skillsTable")}>
               <div className="skill-table-scroll skills-table-scroll">
                 <Table className="skills-table">
                   <TableHeader>
@@ -1449,15 +1496,16 @@ export function App() {
                           checked={visibleRowsSelected}
                           mixed={someVisibleRowsSelected && !visibleRowsSelected}
                           onChange={toggleVisibleRows}
+                          label={t("selectVisibleSkills")}
                         />
                       </TableHead>
-                      <TableHead><SortableHeader label="Name" sortKey="name" sort={skillSort} onSort={updateSkillSort} /></TableHead>
-                      <TableHead><SortableHeader label="Source" sortKey="source" sort={skillSort} onSort={updateSkillSort} /></TableHead>
-                      <TableHead><SortableHeader label="State" sortKey="state" sort={skillSort} onSort={updateSkillSort} /></TableHead>
-                      <TableHead><SortableHeader label="Local copy" sortKey="local_copy" sort={skillSort} onSort={updateSkillSort} /></TableHead>
-                      <TableHead><SortableHeader label="Local modified" sortKey="local_modified" sort={skillSort} onSort={updateSkillSort} /></TableHead>
-                      <TableHead><SortableHeader label="Last used" sortKey="last_used" sort={skillSort} onSort={updateSkillSort} /></TableHead>
-                      <TableHead className="action-cell">Action</TableHead>
+                      <TableHead><SortableHeader label={t("name")} sortKey="name" sort={skillSort} onSort={updateSkillSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("source")} sortKey="source" sort={skillSort} onSort={updateSkillSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("state")} sortKey="state" sort={skillSort} onSort={updateSkillSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("localCopy")} sortKey="local_copy" sort={skillSort} onSort={updateSkillSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("localModified")} sortKey="local_modified" sort={skillSort} onSort={updateSkillSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("lastUsed")} sortKey="last_used" sort={skillSort} onSort={updateSkillSort} t={t} /></TableHead>
+                      <TableHead className="action-cell">{t("action")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1467,8 +1515,8 @@ export function App() {
                       <TableRow>
                         <TableCell colSpan={8}>
                           <div className="empty-state">
-                            <h2>No skills match this view</h2>
-                            <p>Clear the search or switch filters to see available local and managed skills.</p>
+                            <h2>{t("noSkillsMatch")}</h2>
+                            <p>{t("noSkillsMatchDescription")}</p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1495,7 +1543,7 @@ export function App() {
                             <Checkbox
                               checked={checkedRowKeys.includes(rowKey(row))}
                               onChange={(event) => toggleRowChecked(row, event.target.checked)}
-                              aria-label={`Select ${row.name || row.id}`}
+                              aria-label={t("selectSkill", { name: row.name || row.id })}
                             />
                           </TableCell>
                           <TableCell>
@@ -1506,17 +1554,17 @@ export function App() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={`source-badge ${row.source}`}>
-                              {sourceLabel(row.source)}
+                              {sourceLabel(row.source, t)}
                             </Badge>
                           </TableCell>
-                          <TableCell><SyncBadge state={row.syncState} /></TableCell>
+                          <TableCell><SyncBadge state={row.syncState} t={t} /></TableCell>
                           <TableCell>
                             <span className={row.installed ? "install-state installed" : "install-state"}>
-                              {row.installed ? "Installed" : "Missing"}
+                              {row.installed ? t("installed") : t("missing")}
                             </span>
                           </TableCell>
-                          <TableCell><span className="skill-time">{formatLocalModified(row.localModifiedAt)}</span></TableCell>
-                          <TableCell><span className="skill-time">{formatLastUsed(row.lastUsedAt)}</span></TableCell>
+                          <TableCell><span className="skill-time">{formatLocalModified(row.localModifiedAt, locale, t)}</span></TableCell>
+                          <TableCell><span className="skill-time">{formatLastUsed(row.lastUsedAt, locale, t)}</span></TableCell>
                           <TableCell className="action-cell">
                             <RowAction
                               row={row}
@@ -1524,6 +1572,7 @@ export function App() {
                               onAction={requestSkillAction}
                               onEdit={requestSkillEditor}
                               onCompare={() => void openCompareVersions(row)}
+                              t={t}
                             />
                           </TableCell>
                         </TableRow>
@@ -1531,15 +1580,15 @@ export function App() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="pagination-bar" aria-label="Skill table pagination">
+              <div className="pagination-bar" aria-label={t("skillTablePagination")}>
                 <div className="pagination-summary">
                   <strong>{filteredRows.length === 0 ? "0" : `${pageStart}-${pageEnd}`}</strong>
-                  <span>of {filteredRows.length}</span>
+                  <span>{t("of")} {filteredRows.length}</span>
                 </div>
                 <label className="page-size-select">
-                  <span>Rows</span>
+                  <span>{t("rows")}</span>
                   <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value) as PageSize)}>
-                    <SelectTrigger aria-label="Rows per page">
+                    <SelectTrigger aria-label={t("rows")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1558,13 +1607,13 @@ export function App() {
                     type="button"
                     onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
                     disabled={loading || filteredRows.length === 0 || currentPageIndex === 0}
-                    aria-label="Previous page"
-                    title="Previous page"
+                    aria-label={t("previousPage")}
+                    title={t("previousPage")}
                   >
                     <ChevronLeft size={15} aria-hidden="true" />
                   </Button>
                   <span className="pagination-page">
-                    Page {currentPageIndex + 1} / {pageCount}
+                    {t("page")} {currentPageIndex + 1} / {pageCount}
                   </span>
                   <Button
                     variant="secondary"
@@ -1572,8 +1621,8 @@ export function App() {
                     type="button"
                     onClick={() => setPageIndex((current) => Math.min(pageCount - 1, current + 1))}
                     disabled={loading || filteredRows.length === 0 || currentPageIndex >= pageCount - 1}
-                    aria-label="Next page"
-                    title="Next page"
+                    aria-label={t("nextPage")}
+                    title={t("nextPage")}
                   >
                     <ChevronRight size={15} aria-hidden="true" />
                   </Button>
@@ -1585,61 +1634,61 @@ export function App() {
 
         {configured && activeView === "archive" ? (
           <Card className="skill-panel">
-            <section className="repo-strip" aria-label="Codex archive status">
-              <StatusTile label={archiveState === "active" ? "Archived" : "Trash"} value={String(archiveRows.length)} tone="neutral" />
-              <StatusTile label="Showing" value={archiveState === "active" ? "Active" : "Trash"} tone={archiveState === "active" ? "good" : "risk"} />
-              <StatusTile label="Preview" value={archiveSession ? "Loaded" : "On demand"} tone="neutral" />
+            <section className="repo-strip" aria-label={t("archivedCodexSessions")}>
+              <StatusTile label={archiveState === "active" ? t("archived") : t("trash")} value={String(archiveRows.length)} tone="neutral" />
+              <StatusTile label={t("showing")} value={archiveState === "active" ? t("active") : t("trash")} tone={archiveState === "active" ? "good" : "risk"} />
+              <StatusTile label={t("preview")} value={archiveSession ? t("loaded") : t("onDemand")} tone="neutral" />
               <div className="path-stack">
                 <div className="path-stack-lines">
-                  <PathLine icon={<Archive size={14} aria-hidden="true" />} label="Archive source" value="~/.codex/archived_sessions" />
-                  <PathLine icon={<Trash2 size={14} aria-hidden="true" />} label="Trash" value="~/.codex/archived_sessions/.trash" />
+                  <PathLine icon={<Archive size={14} aria-hidden="true" />} label={t("archiveSource")} value="~/.codex/archived_sessions" />
+                  <PathLine icon={<Trash2 size={14} aria-hidden="true" />} label={t("trash")} value="~/.codex/archived_sessions/.trash" />
                 </div>
                 <div className="path-stack-controls">
                   <Button className="path-stack-action" variant="secondary" size="sm" type="button" onClick={() => void loadCodexArchiveSessions()}>
                     <RefreshCw size={14} aria-hidden="true" />
-                    Refresh archive
+                    {t("refreshArchive")}
                   </Button>
                 </div>
               </div>
             </section>
 
-            <section className="toolbar" aria-label="Archive filters">
+            <section className="toolbar" aria-label={t("archiveFilters")}>
               <label className="search-box">
                 <Search size={16} aria-hidden="true" />
-                <span className="sr-only">Search archived sessions</span>
+                <span className="sr-only">{t("searchArchivedSessions")}</span>
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search archived sessions"
+                  placeholder={t("searchArchivedSessions")}
                   autoComplete="off"
                 />
               </label>
               <label className="filter-select">
-                <span>State</span>
+                <span>{t("state")}</span>
                 <Select value={archiveState} onValueChange={(value) => setArchiveState(value as CodexArchiveState)}>
-                  <SelectTrigger aria-label="Archive state">
+                  <SelectTrigger aria-label={t("archiveState")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active archive</SelectItem>
-                    <SelectItem value="trash">Trash</SelectItem>
+                    <SelectItem value="active">{t("activeArchive")}</SelectItem>
+                    <SelectItem value="trash">{t("trash")}</SelectItem>
                   </SelectContent>
                 </Select>
               </label>
             </section>
 
-            <section className="skill-list codex-archive-list" aria-label="Archived Codex sessions">
+            <section className="skill-list codex-archive-list" aria-label={t("archivedCodexSessions")}>
               <div className="skill-table-scroll codex-archive-scroll">
                 <Table className="codex-archive-table">
                   <TableHeader>
                     <TableRow>
-                      <TableHead><SortableHeader label="Title" sortKey="title" sort={archiveSort} onSort={updateArchiveSort} /></TableHead>
-                      <TableHead><SortableHeader label="Archived at" sortKey="archived_at" sort={archiveSort} onSort={updateArchiveSort} /></TableHead>
-                      <TableHead><SortableHeader label="Updated" sortKey="updated_at" sort={archiveSort} onSort={updateArchiveSort} /></TableHead>
-                      <TableHead><SortableHeader label="Workspace" sortKey="cwd" sort={archiveSort} onSort={updateArchiveSort} /></TableHead>
-                      <TableHead><SortableHeader label="Source" sortKey="source" sort={archiveSort} onSort={updateArchiveSort} /></TableHead>
-                      <TableHead><SortableHeader label="Size" sortKey="size" sort={archiveSort} onSort={updateArchiveSort} /></TableHead>
-                      <TableHead className="action-cell">Action</TableHead>
+                      <TableHead><SortableHeader label={t("title")} sortKey="title" sort={archiveSort} onSort={updateArchiveSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("archivedAt")} sortKey="archived_at" sort={archiveSort} onSort={updateArchiveSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("updated")} sortKey="updated_at" sort={archiveSort} onSort={updateArchiveSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("workspace")} sortKey="cwd" sort={archiveSort} onSort={updateArchiveSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("source")} sortKey="source" sort={archiveSort} onSort={updateArchiveSort} t={t} /></TableHead>
+                      <TableHead><SortableHeader label={t("size")} sortKey="size" sort={archiveSort} onSort={updateArchiveSort} t={t} /></TableHead>
+                      <TableHead className="action-cell">{t("action")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1649,8 +1698,8 @@ export function App() {
                       <TableRow>
                         <TableCell colSpan={7}>
                           <div className="empty-state">
-                            <h2>No archived sessions</h2>
-                            <p>{archiveState === "active" ? "Archived Codex sessions will appear here." : "Deleted archived sessions are kept here until restored."}</p>
+                            <h2>{t("noArchivedSessions")}</h2>
+                            <p>{archiveState === "active" ? t("archivedSessionsEmpty") : t("trashSessionsEmpty")}</p>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1675,24 +1724,33 @@ export function App() {
                               <small>{shortSessionId(row.sessionId)}</small>
                             </span>
                           </TableCell>
-                          <TableCell><span className="skill-time">{formatArchiveDate(row.archivedAt)}</span></TableCell>
-                          <TableCell><span className="skill-time">{formatTimestamp(row.updatedAt)}</span></TableCell>
-                          <TableCell><span className="archive-cwd archive-workspace-cell" title={row.cwd ?? "Unknown workspace"}>{row.cwd ?? "Unknown"}</span></TableCell>
+                          <TableCell><span className="skill-time">{formatArchiveDate(row.archivedAt, locale, t)}</span></TableCell>
+                          <TableCell><span className="skill-time">{formatTimestamp(row.updatedAt, locale, t)}</span></TableCell>
+                          <TableCell><span className="archive-cwd archive-workspace-cell" title={row.cwd ?? t("unknownWorkspace")}>{row.cwd ?? t("unknown")}</span></TableCell>
                           <TableCell><span className="archive-cwd" title={row.sourceLabel}>{row.sourceLabel}</span></TableCell>
                           <TableCell><span className="skill-time">{formatFileSize(row.fileSize)}</span></TableCell>
                           <TableCell className="action-cell" onClick={(event) => event.stopPropagation()}>
                             {archiveState === "active" ? (
-                              <ActionIconButton
-                                label={`Delete archived session ${row.title}`}
-                                busy={busyId === `archive-delete:${archiveRowKey(row)}`}
-                                disabled={busyId !== null && busyId !== `archive-delete:${archiveRowKey(row)}`}
-                                icon={<Trash2 size={14} aria-hidden="true" />}
-                                tone="danger"
-                                onClick={() => setPendingArchiveDelete(row)}
-                              />
+                              <span className="row-actions">
+                                <ActionIconButton
+                                  label={t("unarchiveSession")}
+                                  busy={busyId === `archive-unarchive:${archiveRowKey(row)}`}
+                                  disabled={busyId !== null && busyId !== `archive-unarchive:${archiveRowKey(row)}`}
+                                  icon={<ArchiveRestore size={14} aria-hidden="true" />}
+                                  onClick={() => void runArchiveSessionAction("unarchive", row)}
+                                />
+                                <ActionIconButton
+                                  label={t("delete")}
+                                  busy={busyId === `archive-delete:${archiveRowKey(row)}`}
+                                  disabled={busyId !== null && busyId !== `archive-delete:${archiveRowKey(row)}`}
+                                  icon={<Trash2 size={14} aria-hidden="true" />}
+                                  tone="danger"
+                                  onClick={() => setPendingArchiveDelete(row)}
+                                />
+                              </span>
                             ) : (
                               <ActionIconButton
-                                label={`Restore archived session ${row.title}`}
+                                label={t("restore")}
                                 busy={busyId === `archive-restore:${archiveRowKey(row)}`}
                                 disabled={busyId !== null && busyId !== `archive-restore:${archiveRowKey(row)}`}
                                 icon={<RotateCcw size={14} aria-hidden="true" />}
@@ -1705,15 +1763,15 @@ export function App() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="pagination-bar" aria-label="Archived skill pagination">
+              <div className="pagination-bar" aria-label={t("archivedSkillPagination")}>
                 <div className="pagination-summary">
                   <strong>{filteredArchiveRows.length === 0 ? "0" : `${pageStart}-${pageEnd}`}</strong>
-                  <span>of {filteredArchiveRows.length}</span>
+                  <span>{t("of")} {filteredArchiveRows.length}</span>
                 </div>
                 <label className="page-size-select">
-                  <span>Rows</span>
+                  <span>{t("rows")}</span>
                   <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value) as PageSize)}>
-                    <SelectTrigger aria-label="Rows per page">
+                    <SelectTrigger aria-label={t("rows")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1734,9 +1792,9 @@ export function App() {
                     disabled={loading || filteredArchiveRows.length === 0 || currentPageIndex === 0}
                   >
                     <ChevronLeft size={16} aria-hidden="true" />
-                    <span className="sr-only">Previous page</span>
+                    <span className="sr-only">{t("previousPage")}</span>
                   </Button>
-                  <span className="pagination-page">Page {currentPageIndex + 1} / {pageCount}</span>
+                  <span className="pagination-page">{t("page")} {currentPageIndex + 1} / {pageCount}</span>
                   <Button
                     variant="outline"
                     size="icon"
@@ -1745,7 +1803,7 @@ export function App() {
                     disabled={loading || filteredArchiveRows.length === 0 || currentPageIndex >= pageCount - 1}
                   >
                     <ChevronRight size={16} aria-hidden="true" />
-                    <span className="sr-only">Next page</span>
+                    <span className="sr-only">{t("nextPage")}</span>
                   </Button>
                 </div>
               </div>
@@ -1755,16 +1813,19 @@ export function App() {
       </main>
 
       {configured && activeView === "skills" && detailOpen && selected ? (
-        <DetailDrawer selected={selected} onClose={() => setDetailOpen(false)} />
+        <DetailDrawer selected={selected} t={t} locale={locale} onClose={() => setDetailOpen(false)} />
       ) : null}
 
       {configured && activeView === "archive" && archiveDetailOpen && archiveSession ? (
         <CodexArchiveDrawer
           preview={archiveSession}
           busyId={busyId}
+          t={t}
+          locale={locale}
           onClose={() => setArchiveDetailOpen(false)}
           onDelete={(row) => setPendingArchiveDelete(row)}
           onRestore={(row) => void runArchiveSessionAction("restore", row)}
+          onUnarchive={(row) => void runArchiveSessionAction("unarchive", row)}
         />
       ) : null}
 
@@ -1773,6 +1834,7 @@ export function App() {
           row={editorRow}
           editorState={editorState}
           busyId={busyId}
+          t={t}
           onSave={saveSkillEditor}
           onClose={() => setEditorState(null)}
           onChange={(content) => {
@@ -1784,6 +1846,7 @@ export function App() {
       <ConfirmActionDialog
         action={pendingAction}
         busyId={busyId}
+        t={t}
         onClose={() => setPendingAction(null)}
         onConfirm={() => void confirmPendingAction()}
       />
@@ -1791,6 +1854,7 @@ export function App() {
       <ArchiveDeleteDialog
         row={pendingArchiveDelete}
         busyId={busyId}
+        t={t}
         onClose={() => setPendingArchiveDelete(null)}
         onConfirm={() => void confirmArchiveDelete()}
       />
@@ -1798,6 +1862,7 @@ export function App() {
       <EditSourceDialog
         row={pendingEditRow}
         busyId={busyId}
+        t={t}
         onClose={() => setPendingEditRow(null)}
         onChoose={(row, source) => {
           setPendingEditRow(null);
@@ -1808,6 +1873,7 @@ export function App() {
       <CompareVersionsDialog
         state={compareState}
         busyId={busyId}
+        t={t}
         onClose={() => setCompareState(null)}
         onAcceptVersion={runCompareVersionResolution}
       />
@@ -1815,6 +1881,7 @@ export function App() {
       <RepoConflictsDialog
         state={repoConflictState}
         busyId={busyId}
+        t={t}
         onClose={() => setRepoConflictState(null)}
         onSelect={(skillId, source) => {
           setRepoConflictState((current) =>
@@ -1832,12 +1899,14 @@ function SortableHeader<TSortKey extends string>({
   label,
   sortKey,
   sort,
-  onSort
+  onSort,
+  t
 }: {
   label: string;
   sortKey: TSortKey;
   sort: SortState<TSortKey>;
   onSort: (key: TSortKey) => void;
+  t: TFunction;
 }) {
   const active = sort.key === sortKey;
   const ariaSort = active ? (sort.direction === "asc" ? "ascending" : "descending") : "none";
@@ -1849,7 +1918,7 @@ function SortableHeader<TSortKey extends string>({
         className={active ? "table-sort-button active" : "table-sort-button"}
         type="button"
         onClick={() => onSort(sortKey)}
-        aria-label={`Sort by ${label}`}
+        aria-label={t("sortBy", { label })}
       >
         <span>{label}</span>
         <Icon size={13} aria-hidden="true" />
@@ -1861,17 +1930,19 @@ function SortableHeader<TSortKey extends string>({
 function SelectAllCheckbox({
   checked,
   mixed,
-  onChange
+  onChange,
+  label
 }: {
   checked: boolean;
   mixed: boolean;
   onChange: (checked: boolean) => void;
+  label: string;
 }) {
   return (
     <Checkbox
       checked={mixed ? "indeterminate" : checked}
       onChange={(event) => onChange(event.target.checked)}
-      aria-label="Select visible skills"
+      aria-label={label}
       aria-checked={mixed ? "mixed" : checked}
     />
   );
@@ -2053,29 +2124,41 @@ function skillActionBody(row: SkillRow): { skillId: string; source?: LocalSkillS
   return row.localSources.length === 1 ? { skillId: row.id, source: row.localSources[0] } : { skillId: row.id };
 }
 
-function syncResultMessage(result: SyncResult) {
+function syncResultMessage(result: SyncResult, t: TFunction) {
   if (result.skillIds.length === 0) {
     if (result.committed && result.commitHash) {
-      return `Synced repository changes. Commit ${result.commitHash} was pushed.`;
+      return t("syncRepoChangesPushed", { hash: result.commitHash });
     }
 
-    return "No new repository commit was needed. Remote is up to date.";
+    return t("remoteUpToDate");
   }
 
-  const target = result.skillIds.length === 1 ? result.skillIds[0] : `${result.skillIds.length} skills`;
+  const target = result.skillIds.length === 1 ? result.skillIds[0] : t("skillCount", { count: result.skillIds.length });
   if (result.committed && result.commitHash) {
-    return `Synced ${target}. Commit ${result.commitHash} was pushed.`;
+    return t("syncedTargetCommit", { target, hash: result.commitHash });
   }
 
-  return `No new commit was needed. Pushed ${target}.`;
+  return t("noNewCommitPushed", { target });
 }
 
-function dependencyInstallMessage(result: DependencyInstallInfo) {
+function dependencyInstallMessage(result: DependencyInstallInfo, t: TFunction) {
   if (result.status !== "installed") {
     return null;
   }
 
-  return result.message;
+  return result.command ? t("installedDependenciesWithCommand", { command: result.command }) : t("dependenciesInstalled");
+}
+
+function skillActionFailureLabel(endpoint: SkillActionEndpoint, t: TFunction) {
+  const labels: Record<SkillActionEndpoint, string> = {
+    import: t("addToSync"),
+    install: t("installLocal"),
+    "update-local": t("updateLocal"),
+    "stop-syncing": t("stopSyncing"),
+    "remove-local": t("removeLocalCopy")
+  };
+
+  return labels[endpoint];
 }
 
 function actionBusyId(endpoint: SkillActionEndpoint | "compare", row: SkillRow) {
@@ -2128,9 +2211,9 @@ function SummaryAction({
   );
 }
 
-function UsageTraceStatus({ status }: { status: UsageMonitorStatus }) {
+function UsageTraceStatus({ status, t, locale }: { status: UsageMonitorStatus; t: TFunction; locale: Locale }) {
   const healthy = status.enabled && !status.lastError;
-  const label = status.running ? "Scanning" : status.enabled ? "Listening" : "Paused";
+  const label = status.running ? t("scanning") : status.enabled ? t("listening") : t("paused");
 
   return (
     <div className={`usage-trace-status ${status.lastError ? "risk" : healthy ? "good" : "neutral"}`}>
@@ -2138,13 +2221,13 @@ function UsageTraceStatus({ status }: { status: UsageMonitorStatus }) {
         <span className="summary-action-icon">
           <Clock3 size={15} aria-hidden="true" />
         </span>
-        <span>Usage scan</span>
+        <span>{t("usageScan")}</span>
       </span>
       <strong>{label}</strong>
       <small>
         {status.lastError
           ? status.lastError
-          : `Tool-call scan every ${Math.round(status.intervalMs / 1000)}s. Last scan ${formatMonitorTime(status.lastScanCompletedAt)}.`}
+          : t("usageScanStatus", { seconds: Math.round(status.intervalMs / 1000), time: formatMonitorTime(status.lastScanCompletedAt, locale, t) })}
       </small>
     </div>
   );
@@ -2160,7 +2243,7 @@ function PathLine({ icon, label, value }: { icon: ReactNode; label: string; valu
   );
 }
 
-function SyncBadge({ state }: { state: SkillRow["syncState"] }) {
+function SyncBadge({ state, t }: { state: SkillRow["syncState"]; t: TFunction }) {
   const icon = state === "clean" ? <CheckCircle2 size={14} aria-hidden="true" /> : <ShieldAlert size={14} aria-hidden="true" />;
   const variant: "success" | "warning" | "destructive" | "default" =
     state === "clean" ? "success" : state === "conflict" ? "destructive" : "warning";
@@ -2168,16 +2251,16 @@ function SyncBadge({ state }: { state: SkillRow["syncState"] }) {
   return (
     <Badge variant={variant} className={`sync-badge ${state}`}>
       {icon}
-      {syncLabel(state)}
+      {syncLabel(state, t)}
     </Badge>
   );
 }
 
-function AutoSyncIndicator({ status }: { status: AutoSyncStatus }) {
-  const text = formatAutoSyncLabel(status);
+function AutoSyncIndicator({ status, t }: { status: AutoSyncStatus; t: TFunction }) {
+  const text = formatAutoSyncLabel(status, t);
   const isActive = status.enabled;
   const classes = `auto-sync-indicator ${isActive ? `mode-${status.mode}` : "mode-disabled"}${status.running ? " running" : ""}`;
-  const tooltip = status.lastError ? `Auto-sync blocked: ${status.lastError}` : statusMessage(status);
+  const tooltip = status.lastError ? `${t("autoSyncOff")}: ${status.lastError}` : statusMessage(status, t);
 
   return (
     <span className={classes} title={tooltip} role="status" aria-live="polite">
@@ -2187,8 +2270,8 @@ function AutoSyncIndicator({ status }: { status: AutoSyncStatus }) {
   );
 }
 
-function BranchSyncBadge({ status, busy, onReview }: { status: GitBranchSyncStatus; busy?: boolean; onReview?: () => void }) {
-  const label = branchSyncLabel(status);
+function BranchSyncBadge({ status, busy, onReview, t }: { status: GitBranchSyncStatus; busy?: boolean; onReview?: () => void; t: TFunction }) {
+  const label = branchSyncLabel(status, t);
   const needsAttention = status.state === "ahead" || status.state === "behind" || status.state === "diverged";
   const className = `branch-sync-badge ${status.state}${needsAttention ? " attention" : ""}`;
   const content = (
@@ -2200,14 +2283,14 @@ function BranchSyncBadge({ status, busy, onReview }: { status: GitBranchSyncStat
 
   if (onReview) {
     return (
-      <button className={`${className} branch-sync-button`} title="Review repo conflicts" type="button" onClick={onReview} disabled={busy}>
+      <button className={`${className} branch-sync-button`} title={branchSyncActionTitle(status, t)} type="button" onClick={onReview} disabled={busy}>
         {content}
       </button>
     );
   }
 
   return (
-    <span className={className} title={branchSyncTitle(status)} role="status" aria-live="polite">
+    <span className={className} title={branchSyncTitle(status, t)} role="status" aria-live="polite">
       {content}
     </span>
   );
@@ -2218,13 +2301,15 @@ function RowAction({
   busyId,
   onAction,
   onEdit,
-  onCompare
+  onCompare,
+  t
 }: {
   row: SkillRow;
   busyId: string | null;
   onAction: (endpoint: SkillActionEndpoint, row: SkillRow) => void;
   onEdit: (row: SkillRow) => void;
   onCompare: (row: SkillRow) => void;
+  t: TFunction;
 }) {
   const importBusy = busyId === actionBusyId("import", row);
   const installBusy = busyId === actionBusyId("install", row);
@@ -2243,14 +2328,14 @@ function RowAction({
     canRemoveLocal(row);
 
   if (!hasAction) {
-    return <span className="row-actions muted">View</span>;
+    return <span className="row-actions muted">{t("view")}</span>;
   }
 
   return (
     <span className="row-actions">
       {canEditLocal(row) ? (
         <ActionIconButton
-          label="Edit local SKILL.md"
+          label={t("editLocalSkillMd")}
           busy={editBusy}
           disabled={busyId !== null && !editBusy}
           icon={<FilePenLine size={14} aria-hidden="true" />}
@@ -2259,7 +2344,7 @@ function RowAction({
       ) : null}
       {canAddToSync(row) ? (
         <ActionIconButton
-          label="Add to sync"
+          label={t("addToSync")}
           busy={importBusy}
           disabled={busyId !== null && !importBusy}
           icon={<PlusCircle size={14} aria-hidden="true" />}
@@ -2268,7 +2353,7 @@ function RowAction({
       ) : null}
       {canInstallLocal(row) ? (
         <ActionIconButton
-          label="Install local"
+          label={t("installLocal")}
           busy={installBusy}
           disabled={busyId !== null && !installBusy}
           icon={<Download size={14} aria-hidden="true" />}
@@ -2277,7 +2362,7 @@ function RowAction({
       ) : null}
       {canUpdateLocal(row) ? (
         <ActionIconButton
-          label="Update local"
+          label={t("updateLocal")}
           busy={updateBusy}
           disabled={busyId !== null && !updateBusy}
           icon={<Download size={14} aria-hidden="true" />}
@@ -2286,7 +2371,7 @@ function RowAction({
       ) : null}
       {canCompareVersions(row) ? (
         <ActionIconButton
-          label="Compare versions"
+          label={t("compareVersions")}
           busy={compareBusy}
           disabled={busyId !== null && !compareBusy}
           icon={<GitCompareArrows size={14} aria-hidden="true" />}
@@ -2295,7 +2380,7 @@ function RowAction({
       ) : null}
       {canStopSyncing(row) ? (
         <ActionIconButton
-          label="Stop syncing"
+          label={t("stopSyncing")}
           busy={stopSyncingBusy}
           disabled={busyId !== null && !stopSyncingBusy}
           icon={<Unlink2 size={14} aria-hidden="true" />}
@@ -2304,7 +2389,7 @@ function RowAction({
       ) : null}
       {canRemoveLocal(row) ? (
         <ActionIconButton
-          label={row.localSources.length > 1 ? "Remove local copies" : "Remove local copy"}
+          label={row.localSources.length > 1 ? t("removeLocalCopies") : t("removeLocalCopy")}
           busy={removeBusy}
           disabled={busyId !== null && !removeBusy}
           icon={<Trash2 size={14} aria-hidden="true" />}
@@ -2360,11 +2445,13 @@ function ActionIconButton({
 function EditSourceDialog({
   row,
   busyId,
+  t,
   onClose,
   onChoose
 }: {
   row: SkillRow | null;
   busyId: string | null;
+  t: TFunction;
   onClose: () => void;
   onChoose: (row: SkillRow, source: LocalSkillSource) => void;
 }) {
@@ -2388,13 +2475,13 @@ function EditSourceDialog({
                 <FilePenLine size={16} />
               </div>
               <div>
-                <DialogTitle id="edit-source-title">Choose local copy to edit</DialogTitle>
+                <DialogTitle id="edit-source-title">{t("chooseLocalCopyToEdit")}</DialogTitle>
                 <DialogDescription id="edit-source-description">
-                  {row.name || row.id} is installed in more than one local skills folder. Pick the copy you want to edit.
+                  {t("chooseLocalCopyDescription", { name: row.name || row.id })}
                 </DialogDescription>
               </div>
             </DialogHeader>
-            <div className="edit-source-options" aria-label="Local copies">
+            <div className="edit-source-options" aria-label={t("localCopies")}>
               {localSourcesForRow(row).map((source) => (
                 <button
                   className="edit-source-option"
@@ -2403,14 +2490,14 @@ function EditSourceDialog({
                   onClick={() => onChoose(row, source)}
                   disabled={busyId !== null}
                 >
-                  <span>{sourceLabel(source)}</span>
+                  <span>{sourceLabel(source, t)}</span>
                   <code>{localPathForSource(row, source)}</code>
                 </button>
               ))}
             </div>
             <DialogFooter className="confirm-dialog-footer">
               <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
-                Cancel
+                {t("cancel")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2423,11 +2510,13 @@ function EditSourceDialog({
 function CompareVersionsDialog({
   state,
   busyId,
+  t,
   onClose,
   onAcceptVersion
 }: {
   state: { row: SkillRow; versions: SkillVersion[] } | null;
   busyId: string | null;
+  t: TFunction;
   onClose: () => void;
   onAcceptVersion: (strategy: ResolveStrategy) => Promise<void>;
 }) {
@@ -2453,20 +2542,20 @@ function CompareVersionsDialog({
                 <GitCompareArrows size={16} />
               </div>
               <div>
-                <DialogTitle id="compare-versions-title">Compare {state.row.name || state.row.id}</DialogTitle>
-                <DialogDescription id="compare-versions-description">Compare local and repo versions from each known source.</DialogDescription>
+                <DialogTitle id="compare-versions-title">{t("compareTitle", { name: state.row.name || state.row.id })}</DialogTitle>
+                <DialogDescription id="compare-versions-description">{t("compareDescription")}</DialogDescription>
               </div>
             </DialogHeader>
             <div className="compare-source-grid">
               {state.versions.map((version) => (
                 <section className="compare-source" key={version.source}>
                   <div className="compare-source-title">
-                    <strong>{sourceLabel(version.source)}</strong>
-                    <span>{version.exists ? "Available" : "Missing"}</span>
+                    <strong>{sourceLabel(version.source, t)}</strong>
+                    <span>{version.exists ? t("available") : t("missing")}</span>
                   </div>
                   <p className="compare-source-path">{version.path}</p>
                   <pre className="compare-source-content">
-                    <code>{version.content ?? "No SKILL.md present in this source."}</code>
+                    <code>{version.content ?? t("noSkillMd")}</code>
                   </pre>
                   <div className="compare-source-actions">
                     <Button
@@ -2477,8 +2566,8 @@ function CompareVersionsDialog({
                       disabled={versionDisabled(version)}
                       title={
                         version.exists
-                          ? `Accept ${sourceLabel(version.source)} version for ${state.row.name || state.row.id}`
-                          : `${sourceLabel(version.source)} version is missing`
+                          ? t("acceptVersionTitle", { source: sourceLabel(version.source, t), name: state.row.name || state.row.id })
+                          : t("versionMissingTitle", { source: sourceLabel(version.source, t) })
                       }
                     >
                       {busyId === compareResolveBusyId(state.row, version.source) ? (
@@ -2486,7 +2575,7 @@ function CompareVersionsDialog({
                       ) : (
                         <CheckCircle2 size={14} aria-hidden="true" />
                       )}
-                      Accept this version
+                      {t("acceptThisVersion")}
                     </Button>
                   </div>
                 </section>
@@ -2495,7 +2584,7 @@ function CompareVersionsDialog({
             <DialogFooter className="compare-footer">
               <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
                 {busy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <X size={15} aria-hidden="true" />}
-                Close
+                {t("close")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2508,12 +2597,14 @@ function CompareVersionsDialog({
 function RepoConflictsDialog({
   state,
   busyId,
+  t,
   onClose,
   onSelect,
   onResolve
 }: {
   state: { conflicts: RepoSkillConflict[]; selections: Record<string, RepoConflictSource> } | null;
   busyId: string | null;
+  t: TFunction;
   onClose: () => void;
   onSelect: (skillId: string, source: RepoConflictSource) => void;
   onResolve: () => void;
@@ -2540,10 +2631,8 @@ function RepoConflictsDialog({
                 <GitCompareArrows size={16} />
               </div>
               <div>
-                <DialogTitle id="repo-conflicts-title">Review repo conflicts</DialogTitle>
-                <DialogDescription id="repo-conflicts-description">
-                  Choose the canonical version for each conflicted skill. System metadata is merged automatically.
-                </DialogDescription>
+                <DialogTitle id="repo-conflicts-title">{t("reviewRepoConflicts")}</DialogTitle>
+                <DialogDescription id="repo-conflicts-description">{t("repoConflictsDescription")}</DialogDescription>
               </div>
             </DialogHeader>
             <div className="repo-conflict-stack">
@@ -2554,15 +2643,15 @@ function RepoConflictsDialog({
                     <div className="repo-conflict-card-head">
                       <div>
                         <h3>{conflict.skillId}</h3>
-                        <p>{conflict.files.length} conflicted file{conflict.files.length === 1 ? "" : "s"}</p>
+                        <p>{t("conflictedFile", { count: conflict.files.length, plural: conflict.files.length === 1 ? "" : "s" })}</p>
                       </div>
-                      <Badge variant="destructive">Needs choice</Badge>
+                      <Badge variant="destructive">{t("needsChoice")}</Badge>
                     </div>
                     <div className="repo-conflict-files">
                       {conflict.files.slice(0, 4).map((filePath) => (
                         <code key={filePath}>{filePath}</code>
                       ))}
-                      {conflict.files.length > 4 ? <span>+{conflict.files.length - 4} more</span> : null}
+                      {conflict.files.length > 4 ? <span>{t("moreFiles", { count: conflict.files.length - 4 })}</span> : null}
                     </div>
                     <div className="compare-source-grid">
                       {conflict.versions.map((version) => {
@@ -2570,12 +2659,12 @@ function RepoConflictsDialog({
                         return (
                           <section className={`compare-source repo-version-card${selected ? " selected" : ""}`} key={version.source}>
                             <div className="compare-source-title">
-                              <strong>{repoConflictSourceLabel(version.source)}</strong>
-                              <span>{version.exists ? (selected ? "Selected" : "Available") : "Missing"}</span>
+                              <strong>{repoConflictSourceLabel(version.source, t)}</strong>
+                              <span>{version.exists ? (selected ? t("selected") : t("available")) : t("missing")}</span>
                             </div>
                             <p className="compare-source-path">{version.path}</p>
                             <pre className="compare-source-content">
-                              <code>{version.content ?? "No SKILL.md present in this source."}</code>
+                              <code>{version.content ?? t("noSkillMd")}</code>
                             </pre>
                             <div className="compare-source-actions">
                               <Button
@@ -2584,10 +2673,10 @@ function RepoConflictsDialog({
                                 type="button"
                                 onClick={() => onSelect(conflict.skillId, version.source)}
                                 disabled={busy || !version.exists}
-                                title={version.exists ? `Use ${repoConflictSourceLabel(version.source)} for ${conflict.skillId}` : `${version.label} is missing`}
+                                title={version.exists ? t("useVersionTitle", { source: repoConflictSourceLabel(version.source, t), skillId: conflict.skillId }) : t("versionMissingTitle", { source: version.label })}
                               >
                                 <CheckCircle2 size={14} aria-hidden="true" />
-                                Use this version
+                                {t("useThisVersion")}
                               </Button>
                             </div>
                           </section>
@@ -2601,11 +2690,11 @@ function RepoConflictsDialog({
             <DialogFooter className="compare-footer">
               <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
                 <X size={15} aria-hidden="true" />
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="button" onClick={onResolve} disabled={busy || conflictCount === 0}>
                 {resolving ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <GitCompareArrows size={15} aria-hidden="true" />}
-                Resolve and push
+                {t("resolveAndPush")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2618,16 +2707,18 @@ function RepoConflictsDialog({
 function ConfirmActionDialog({
   action,
   busyId,
+  t,
   onClose,
   onConfirm
 }: {
   action: PendingSkillAction | null;
   busyId: string | null;
+  t: TFunction;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const busy = action ? busyId === actionBusyId(action.endpoint, action.row) : false;
-  const copy = action ? confirmDialogCopy(action.endpoint, action.row) : null;
+  const copy = action ? confirmDialogCopy(action.endpoint, action.row, t) : null;
 
   return (
     <Dialog
@@ -2651,7 +2742,7 @@ function ConfirmActionDialog({
                 <DialogDescription id="confirm-action-description">{copy.description}</DialogDescription>
               </div>
             </DialogHeader>
-            <div className="confirm-scope" aria-label="Action scope">
+            <div className="confirm-scope" aria-label={t("actionScope")}>
               {copy.scope.map((item) => (
                 <div className="confirm-scope-item" key={item.label}>
                   <span>{item.label}</span>
@@ -2661,7 +2752,7 @@ function ConfirmActionDialog({
             </div>
             <DialogFooter className="confirm-dialog-footer">
               <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button variant={copy.danger ? "destructive" : "primary"} type="button" onClick={onConfirm} disabled={busy}>
                 {busy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : copy.icon}
@@ -2675,37 +2766,34 @@ function ConfirmActionDialog({
   );
 }
 
-function confirmDialogCopy(endpoint: SkillActionEndpoint, row: SkillRow) {
+function confirmDialogCopy(endpoint: SkillActionEndpoint, row: SkillRow, t: TFunction) {
   const skillName = row.name || row.id;
   if (endpoint === "stop-syncing") {
     return {
-      title: `Stop syncing ${skillName}?`,
-      description:
-        "This deletes the synced repository copy and metadata record. Installed local copies stay available on this machine.",
-      confirmLabel: "Stop syncing",
+      title: t("stopSyncingTitle", { name: skillName }),
+      description: t("stopSyncingDescription"),
+      confirmLabel: t("stopSyncing"),
       icon: <Unlink2 size={16} aria-hidden="true" />,
       danger: true,
       scope: [
-        { label: "Local copies", value: "Kept installed" },
-        { label: "Sync repo", value: "Delete repo/skills copy and metadata" },
-        { label: "Git remote", value: "Commit and push the removal" }
+        { label: t("localCopies"), value: t("keptInstalled") },
+        { label: t("syncRepo"), value: t("deleteRepoCopyMetadata") },
+        { label: t("gitRemote"), value: t("commitPushRemoval") }
       ]
     };
   }
 
   const multipleLocalCopies = row.localSources.length > 1;
   return {
-    title: multipleLocalCopies ? `Remove local copies of ${skillName}?` : `Remove local copy of ${skillName}?`,
-    description: multipleLocalCopies
-      ? "This deletes the skill from both local skill folders on this machine. The synced copy stays in the repository and can be installed again."
-      : "This deletes the skill folder from this machine only. The synced copy stays in the repository and can be installed again.",
-    confirmLabel: multipleLocalCopies ? "Remove local copies" : "Remove local copy",
+    title: multipleLocalCopies ? t("removeLocalCopiesTitle", { name: skillName }) : t("removeLocalCopyTitle", { name: skillName }),
+    description: multipleLocalCopies ? t("removeLocalCopiesDescription") : t("removeLocalCopyDescription"),
+    confirmLabel: multipleLocalCopies ? t("removeLocalCopies") : t("removeLocalCopy"),
     icon: <Trash2 size={16} aria-hidden="true" />,
     danger: true,
     scope: [
-      { label: "This machine", value: multipleLocalCopies ? "Delete Codex and Agents copies" : "Delete local folder" },
-      { label: "Sync repo", value: "Leave unchanged" },
-      { label: "Git remote", value: "No sync state change" }
+      { label: t("thisMachine"), value: multipleLocalCopies ? t("deleteCodexAgentsCopies") : t("deleteLocalFolder") },
+      { label: t("syncRepo"), value: t("leaveUnchanged") },
+      { label: t("gitRemote"), value: t("noSyncStateChange") }
     ]
   };
 }
@@ -2713,11 +2801,13 @@ function confirmDialogCopy(endpoint: SkillActionEndpoint, row: SkillRow) {
 function ArchiveDeleteDialog({
   row,
   busyId,
+  t,
   onClose,
   onConfirm
 }: {
   row: CodexArchiveRow | null;
   busyId: string | null;
+  t: TFunction;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -2741,19 +2831,17 @@ function ArchiveDeleteDialog({
                 <Trash2 size={16} />
               </div>
               <div>
-                <DialogTitle id="archive-delete-title">Delete archived session?</DialogTitle>
-                <DialogDescription id="archive-delete-description">
-                  This moves the archived session to Trash. You can restore it from the Trash view.
-                </DialogDescription>
+                <DialogTitle id="archive-delete-title">{t("deleteArchivedSessionTitle")}</DialogTitle>
+                <DialogDescription id="archive-delete-description">{t("deleteArchivedSessionDescription")}</DialogDescription>
               </div>
             </DialogHeader>
             <DialogFooter className="confirm-dialog-footer">
               <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button variant="destructive" type="button" onClick={onConfirm} disabled={busy}>
                 {busy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
-                Delete
+                {t("delete")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2765,9 +2853,13 @@ function ArchiveDeleteDialog({
 
 function DetailDrawer({
   selected,
+  t,
+  locale,
   onClose
 }: {
   selected: SkillRow;
+  t: TFunction;
+  locale: Locale;
   onClose: () => void;
 }) {
   return (
@@ -2776,38 +2868,38 @@ function DetailDrawer({
         <SheetHeader>
           <div className="drawer-title-row">
             <div>
-              <p className="eyebrow">{kindLabel(selected.kind)}</p>
+              <p className="eyebrow">{kindLabel(selected.kind, t)}</p>
               <SheetTitle>{selected.name || selected.id}</SheetTitle>
             </div>
-            <Button className="icon-button" variant="outline" size="icon" type="button" onClick={onClose} aria-label="Close details">
+            <Button className="icon-button" variant="outline" size="icon" type="button" onClick={onClose} aria-label={t("closeDetails")}>
               <X size={18} aria-hidden="true" />
             </Button>
           </div>
-          <p>{selected.description || "No description in SKILL.md frontmatter."}</p>
+          <p>{selected.description || t("noDescription")}</p>
           <div className="drawer-badges">
-            <SyncBadge state={selected.syncState} />
-            <span className={`source-badge ${selected.source}`}>{sourceLabel(selected.source)}</span>
+            <SyncBadge state={selected.syncState} t={t} />
+            <span className={`source-badge ${selected.source}`}>{sourceLabel(selected.source, t)}</span>
           </div>
         </SheetHeader>
 
-        <div className="detail-metadata" aria-label="Skill summary">
-          <DetailField label="Source" value={sourceLabel(selected.source)} />
-          <DetailField label="Local copy" value={selected.installed ? "Installed" : "Missing"} />
-          <DetailField label="Sync state" value={syncLabel(selected.syncState)} />
-          <DetailField label="Last used" value={formatLastUsed(selected.lastUsedAt)} />
-          <DetailField label="Local modified" value={formatLocalModified(selected.localModifiedAt)} />
+        <div className="detail-metadata" aria-label={t("skillSummary")}>
+          <DetailField label={t("source")} value={sourceLabel(selected.source, t)} />
+          <DetailField label={t("localCopy")} value={selected.installed ? t("installed") : t("missing")} />
+          <DetailField label={t("syncState")} value={syncLabel(selected.syncState, t)} />
+          <DetailField label={t("lastUsed")} value={formatLastUsed(selected.lastUsedAt, locale, t)} />
+          <DetailField label={t("localModified")} value={formatLocalModified(selected.localModifiedAt, locale, t)} />
         </div>
 
         <div className="detail-section">
-          <h3>Paths</h3>
-          <KeyValue label="Local copy" value={selected.localPath ?? "Missing on this machine"} />
-          <KeyValue label="Sync repo" value={selected.repoPath ?? "Not added to sync"} />
+          <h3>{t("paths")}</h3>
+          <KeyValue label={t("localCopy")} value={selected.localPath ?? t("missingOnMachine")} />
+          <KeyValue label={t("syncRepo")} value={selected.repoPath ?? t("notAddedToSync")} />
         </div>
 
         <div className="detail-section">
-          <h3>Hashes</h3>
-          <KeyValue label="Local hash" value={localHashLabel(selected)} />
-          <KeyValue label="Repo hash" value={shortHash(selected.repoHash)} />
+          <h3>{t("hashes")}</h3>
+          <KeyValue label={t("localHash")} value={localHashLabel(selected, t)} />
+          <KeyValue label={t("repoHash")} value={shortHash(selected.repoHash, t)} />
         </div>
       </SheetContent>
     </Sheet>
@@ -2817,24 +2909,31 @@ function DetailDrawer({
 function CodexArchiveDrawer({
   preview,
   busyId,
+  t,
+  locale,
   onClose,
   onDelete,
-  onRestore
+  onRestore,
+  onUnarchive
 }: {
   preview: CodexArchivePreviewResponse;
   busyId: string | null;
+  t: TFunction;
+  locale: Locale;
   onClose: () => void;
   onDelete: (row: CodexArchiveRow) => void;
   onRestore: (row: CodexArchiveRow) => void;
+  onUnarchive: (row: CodexArchiveRow) => void;
 }) {
   const row: CodexArchiveRow = {
     ...preview.item,
     state: preview.state,
-    sourceLabel: preview.item.source || "Unknown"
+    sourceLabel: preview.item.source || t("unknown")
   };
-  const action = preview.state === "active" ? "delete" : "restore";
-  const actionBusyId = `archive-${action}:${archiveRowKey(row)}`;
-  const busy = busyId === actionBusyId;
+  const deleteBusy = busyId === `archive-delete:${archiveRowKey(row)}`;
+  const restoreBusy = busyId === `archive-restore:${archiveRowKey(row)}`;
+  const unarchiveBusy = busyId === `archive-unarchive:${archiveRowKey(row)}`;
+  const busy = deleteBusy || restoreBusy || unarchiveBusy;
 
   return (
     <Sheet open={true} onOpenChange={onClose}>
@@ -2842,57 +2941,63 @@ function CodexArchiveDrawer({
         <SheetHeader>
           <div className="drawer-title-row">
             <div>
-              <p className="eyebrow">{preview.state === "active" ? "Archived session" : "Archive trash"}</p>
+              <p className="eyebrow">{preview.state === "active" ? t("archivedSession") : t("archiveTrash")}</p>
               <SheetTitle>{row.title}</SheetTitle>
             </div>
-            <Button className="icon-button" variant="outline" size="icon" type="button" onClick={onClose} aria-label="Close archived session">
+            <Button className="icon-button" variant="outline" size="icon" type="button" onClick={onClose} aria-label={t("closeArchivedSession")}>
               <X size={18} aria-hidden="true" />
             </Button>
           </div>
           <p>{row.sessionId}</p>
           <div className="drawer-badges">
             <span className={`source-badge repo`}>{row.sourceLabel}</span>
-            <Badge variant={preview.state === "active" ? "success" : "warning"}>{preview.state === "active" ? "Active archive" : "Trash"}</Badge>
+            <Badge variant={preview.state === "active" ? "success" : "warning"}>{preview.state === "active" ? t("activeArchive") : t("trash")}</Badge>
           </div>
         </SheetHeader>
 
-        <div className="detail-metadata" aria-label="Archived session summary">
-          <DetailField label="Archived" value={formatArchiveDate(row.archivedAt)} />
-          <DetailField label="Updated" value={formatTimestamp(row.updatedAt)} />
-          <DetailField label="Source" value={row.sourceLabel} />
-          <DetailField label="File size" value={formatFileSize(row.fileSize)} />
+        <div className="detail-metadata" aria-label={t("archivedSessionSummary")}>
+          <DetailField label={t("archived")} value={formatArchiveDate(row.archivedAt, locale, t)} />
+          <DetailField label={t("updated")} value={formatTimestamp(row.updatedAt, locale, t)} />
+          <DetailField label={t("source")} value={row.sourceLabel} />
+          <DetailField label={t("fileSize")} value={formatFileSize(row.fileSize)} />
         </div>
 
         <div className="detail-section">
-          <h3>Metadata</h3>
-          <KeyValue label="File" value={row.fileName} />
-          <KeyValue label="Session id" value={row.sessionId} />
-          <KeyValue label="Workspace" value={row.cwd ?? "Unknown"} />
+          <h3>{t("metadata")}</h3>
+          <KeyValue label={t("file")} value={row.fileName} />
+          <KeyValue label={t("sessionId")} value={row.sessionId} />
+          <KeyValue label={t("workspace")} value={row.cwd ?? t("unknown")} />
         </div>
 
         <div className="detail-section">
-          <h3>Preview</h3>
+          <h3>{t("preview")}</h3>
           <pre className="archive-preview">
-            <code>{preview.preview.join("\n") || "No preview available."}</code>
+            <code>{preview.preview.join("\n") || t("noPreviewAvailable")}</code>
           </pre>
-          {preview.truncated ? <p className="preview-note">Preview is truncated. Full session content is not loaded by default.</p> : null}
+          {preview.truncated ? <p className="preview-note">{t("previewTruncated")}</p> : null}
         </div>
 
         <div className="editor-footer">
           {preview.state === "active" ? (
-            <Button variant="destructive" type="button" onClick={() => onDelete(row)} disabled={busyId !== null && !busy}>
-              {busy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
-              Delete
-            </Button>
+            <>
+              <Button variant="primary" type="button" onClick={() => onUnarchive(row)} disabled={busyId !== null && !unarchiveBusy}>
+                {unarchiveBusy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <ArchiveRestore size={15} aria-hidden="true" />}
+                {t("unarchive")}
+              </Button>
+              <Button variant="destructive" type="button" onClick={() => onDelete(row)} disabled={busyId !== null && !deleteBusy}>
+                {deleteBusy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
+                {t("delete")}
+              </Button>
+            </>
           ) : (
-            <Button variant="primary" type="button" onClick={() => onRestore(row)} disabled={busyId !== null && !busy}>
-              {busy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <RotateCcw size={15} aria-hidden="true" />}
-              Restore
+            <Button variant="primary" type="button" onClick={() => onRestore(row)} disabled={busyId !== null && !restoreBusy}>
+              {restoreBusy ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <RotateCcw size={15} aria-hidden="true" />}
+              {t("restore")}
             </Button>
           )}
           <Button variant="ghost" type="button" onClick={onClose} disabled={busy}>
             <X size={15} aria-hidden="true" />
-            Close
+            {t("close")}
           </Button>
         </div>
       </SheetContent>
@@ -2904,6 +3009,7 @@ function SkillEditorDrawer({
   row,
   editorState,
   busyId,
+  t,
   onSave,
   onClose,
   onChange
@@ -2911,6 +3017,7 @@ function SkillEditorDrawer({
   row: SkillRow;
   editorState: EditorState;
   busyId: string | null;
+  t: TFunction;
   onSave: (row: SkillRow) => Promise<void>;
   onClose: () => void;
   onChange: (content: string) => void;
@@ -2923,29 +3030,29 @@ function SkillEditorDrawer({
         <div className="drawer-header">
           <div className="drawer-title-row">
             <div>
-              <p className="eyebrow">Local editor</p>
-              <SheetTitle>Edit SKILL.md</SheetTitle>
+              <p className="eyebrow">{t("localEditor")}</p>
+              <SheetTitle>{t("editSkillMd")}</SheetTitle>
             </div>
-            <Button className="icon-button" variant="outline" size="icon" type="button" onClick={onClose} aria-label="Close editor" disabled={saving}>
+            <Button className="icon-button" variant="outline" size="icon" type="button" onClick={onClose} aria-label={t("closeEditor")} disabled={saving}>
               <X size={18} aria-hidden="true" />
             </Button>
           </div>
           <p>{row.name || row.id}</p>
           <div className="drawer-badges">
-            <span className={`source-badge ${editorState.source}`}>{sourceLabel(editorState.source)}</span>
-            {editorState.dirty ? <span className="dirty-badge">Unsaved</span> : <span className="saved-badge">Saved</span>}
+            <span className={`source-badge ${editorState.source}`}>{sourceLabel(editorState.source, t)}</span>
+            {editorState.dirty ? <span className="dirty-badge">{t("unsaved")}</span> : <span className="saved-badge">{t("saved")}</span>}
           </div>
         </div>
 
         <div className="editor-body">
           <div className="editor-path">
-            <span>File</span>
+            <span>{t("file")}</span>
             <code>{editorState.path}</code>
           </div>
           <Textarea
             value={editorState.content}
             onChange={(event) => onChange(event.target.value)}
-            aria-label={`Edit ${row.name || row.id} SKILL.md`}
+            aria-label={`${t("editSkillMd")} ${row.name || row.id}`}
             spellCheck={false}
           />
         </div>
@@ -2958,7 +3065,7 @@ function SkillEditorDrawer({
             disabled={saving || !editorState.dirty}
           >
             {saving ? <Loader2 className="spin" size={15} aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}
-            Save local
+            {t("saveLocal")}
           </Button>
           <Button
             variant="ghost"
@@ -2967,7 +3074,7 @@ function SkillEditorDrawer({
             disabled={saving}
           >
             <X size={15} aria-hidden="true" />
-            Close
+            {t("close")}
           </Button>
         </div>
       </SheetContent>
@@ -3007,16 +3114,16 @@ function SkeletonRows({ columns }: { columns: number }) {
   );
 }
 
-function filterLabel(filter: Filter) {
-  if (filter === "all") return "All";
-  return syncLabel(filter);
+function filterLabel(filter: Filter, t: TFunction) {
+  if (filter === "all") return t("all");
+  return syncLabel(filter, t);
 }
 
-function viewTitle(view: View) {
+function viewTitle(view: View, t: TFunction) {
   const titles: Record<View, string> = {
-    skills: "Skills",
-    archive: "Codex Archive",
-    settings: "Settings"
+    skills: t("skills"),
+    archive: t("codexArchive"),
+    settings: t("settings")
   };
 
   return titles[view];
@@ -3076,7 +3183,7 @@ function nextSortState<TSortKey extends string>(current: SortState<TSortKey>, ke
 }
 
 function defaultSortDirection(key: string): SortDirection {
-  return key.includes("used") || key.includes("modified") || key.includes("archived") ? "desc" : "asc";
+  return key.includes("used") || key.includes("modified") || key.includes("archived") || key.includes("updated") ? "desc" : "asc";
 }
 
 function compareSkillRows(a: SkillRow, b: SkillRow, sort: SortState<SkillSortKey>) {
@@ -3171,50 +3278,50 @@ function parseTimestamp(value: string | null) {
   return Number.isNaN(time) ? null : time;
 }
 
-function syncLabel(state: SkillRow["syncState"] | Filter) {
+function syncLabel(state: SkillRow["syncState"] | Filter, t?: TFunction) {
   const labels: Record<string, string> = {
-    clean: "In sync",
-    local_modified: "Local changed",
-    repo_modified: "Repo changed",
-    conflict: "Conflict",
-    missing_local: "Missing local copy",
-    missing_repo: "Missing in repo",
-    unmanaged: "Local only",
-    repo_only: "Repo only",
-    all: "All"
+    clean: t ? t("inSync") : "In sync",
+    local_modified: t ? t("localChanged") : "Local changed",
+    repo_modified: t ? t("repoChanged") : "Repo changed",
+    conflict: t ? t("conflict") : "Conflict",
+    missing_local: t ? t("missingLocalCopy") : "Missing local copy",
+    missing_repo: t ? t("missingInRepo") : "Missing in repo",
+    unmanaged: t ? t("localOnly") : "Local only",
+    repo_only: t ? t("repoOnly") : "Repo only",
+    all: t ? t("all") : "All"
   };
 
   return labels[state] ?? state;
 }
 
-function formatAutoSyncLabel(status: AutoSyncStatus) {
+function formatAutoSyncLabel(status: AutoSyncStatus, t: TFunction) {
   if (!status.enabled) {
-    return "Auto-sync off";
+    return t("autoSyncOff");
   }
 
   if (status.running) {
-    return "Auto-sync running";
+    return t("autoSyncRunning");
   }
 
   if (status.pending) {
-    return `Auto-sync queued (${status.mode})`;
+    return t("autoSyncQueued", { mode: status.mode });
   }
 
   if (status.watchersSupported) {
-    return `Auto-sync ${status.mode}`;
+    return t("autoSyncMode", { mode: status.mode });
   }
 
-  return "Auto-sync polling";
+  return t("autoSyncPolling");
 }
 
-function statusMessage(status: AutoSyncStatus) {
+function statusMessage(status: AutoSyncStatus, t: TFunction) {
   if (!status.lastRunCompletedAt) {
-    return status.enabled ? "Auto-sync idle" : "Auto-sync off";
+    return status.enabled ? t("autoSyncIdle") : t("autoSyncOff");
   }
 
   const last = new Date(status.lastRunCompletedAt);
   if (Number.isNaN(last.getTime())) {
-    return "Auto-sync idle";
+    return t("autoSyncIdle");
   }
 
   const now = new Date();
@@ -3222,72 +3329,80 @@ function statusMessage(status: AutoSyncStatus) {
   return `${mins} min ago`;
 }
 
-function branchSyncLabel(status: GitBranchSyncStatus) {
+function branchSyncLabel(status: GitBranchSyncStatus, t: TFunction) {
   if (status.state === "up-to-date") {
-    return "Remote synced";
+    return t("remoteSynced");
   }
 
   if (status.state === "ahead") {
-    return `Push needed ${status.ahead}`;
+    return t("pushNeeded", { count: status.ahead });
   }
 
   if (status.state === "behind") {
-    return `Remote changes ${status.behind}`;
+    return t("remoteChanges", { count: status.behind });
   }
 
   if (status.state === "diverged") {
-    return `Sync conflict +${status.ahead}/-${status.behind}`;
+    return t("syncConflict", { ahead: status.ahead, behind: status.behind });
   }
 
   if (status.state === "no-upstream") {
-    return "No upstream";
+    return t("noUpstream");
   }
 
-  return "Remote unknown";
+  return t("remoteUnknown");
 }
 
-function branchSyncTitle(status: GitBranchSyncStatus) {
+function branchSyncTitle(status: GitBranchSyncStatus, t: TFunction) {
   const target = status.upstream ?? "remote";
   if (status.state === "up-to-date") {
-    return `Local branch is up to date with ${target}.`;
+    return t("upToDateWithRemote", { target });
   }
 
   if (status.state === "ahead") {
-    return `${status.ahead} local commit(s) are not on ${target} yet.`;
+    return t("localCommitsAhead", { count: status.ahead, target });
   }
 
   if (status.state === "behind") {
-    return `${target} has ${status.behind} commit(s) not pulled locally.`;
+    return t("remoteCommitsBehind", { target, count: status.behind });
   }
 
   if (status.state === "diverged") {
-    return `Local and ${target} both have unique commits. Next push will rebase or report a conflict.`;
+    return t("divergedTitle", { target });
   }
 
   if (status.state === "no-upstream") {
-    return "No upstream branch is configured for this sync repository.";
+    return t("noUpstreamTitle");
   }
 
-  return "Unable to determine remote branch state.";
+  return t("remoteUnknownTitle");
 }
 
-function sourceLabel(source: SkillRow["source"]) {
+function branchSyncActionTitle(status: GitBranchSyncStatus, t: TFunction) {
+  if (status.state === "diverged") {
+    return t("syncConflictActionTitle");
+  }
+
+  return branchSyncTitle(status, t);
+}
+
+function sourceLabel(source: SkillRow["source"], t?: TFunction) {
   const labels: Record<SkillRow["source"], string> = {
-    codex: "Codex local",
-    agents: "Agents local",
-    both: "Codex + Agents",
-    repo: "Sync repo"
+    codex: t ? t("codexLocal") : "Codex local",
+    agents: t ? t("agentsLocal") : "Agents local",
+    both: t ? t("codexAgents") : "Codex + Agents",
+    repo: t ? t("syncRepo") : "Sync repo"
   };
 
   return labels[source];
 }
 
-function repoConflictSourceLabel(source: RepoConflictSource) {
+function repoConflictSourceLabel(source: RepoConflictSource, t?: TFunction) {
   const labels: Record<RepoConflictSource, string> = {
-    github: "GitHub version",
-    syncRepo: "Sync repo local",
-    codex: "Codex installed copy",
-    agents: "Agents installed copy"
+    github: t ? t("githubVersion") : "GitHub version",
+    syncRepo: t ? t("syncRepoLocal") : "Sync repo local",
+    codex: t ? t("codexInstalledCopy") : "Codex installed copy",
+    agents: t ? t("agentsInstalledCopy") : "Agents installed copy"
   };
 
   return labels[source];
@@ -3299,22 +3414,22 @@ function localPathForSource(row: SkillRow, source: LocalSkillSource) {
   return matchingLine ? matchingLine.slice(prefix.length) : sourceLabel(source);
 }
 
-function localHashLabel(row: SkillRow) {
-  return row.localCopiesDiffer ? "Mixed local copies" : shortHash(row.localHash);
+function localHashLabel(row: SkillRow, t: TFunction) {
+  return row.localCopiesDiffer ? t("mixedLocalCopies") : shortHash(row.localHash, t);
 }
 
-function kindLabel(kind: SkillRow["kind"]) {
+function kindLabel(kind: SkillRow["kind"], t: TFunction) {
   const labels: Record<SkillRow["kind"], string> = {
-    managed: "Tracked skill",
-    unmanaged: "Local-only skill",
-    "repo-only": "Repo-only skill"
+    managed: t("trackedSkill"),
+    unmanaged: t("localOnlySkill"),
+    "repo-only": t("repoOnlySkill")
   };
 
   return labels[kind];
 }
 
-function shortHash(hash: string | null) {
-  return hash ? hash.slice(0, 12) : "None";
+function shortHash(hash: string | null, t?: TFunction) {
+  return hash ? hash.slice(0, 12) : t ? t("none") : "None";
 }
 
 function shortSessionId(sessionId: string) {
@@ -3337,9 +3452,9 @@ function formatFileSize(bytes: number) {
   return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
 }
 
-function formatTimestamp(value: string | null) {
+function formatTimestamp(value: string | null, locale: Locale = "en", t?: TFunction) {
   if (!value) {
-    return "Not tracked";
+    return t ? t("notTracked") : "Not tracked";
   }
 
   const date = new Date(value);
@@ -3347,24 +3462,24 @@ function formatTimestamp(value: string | null) {
     return value;
   }
 
-  return date.toLocaleString();
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
 }
 
-function formatArchiveDate(value: string | null) {
-  return value ? formatTimestamp(value) : "Unknown";
+function formatArchiveDate(value: string | null, locale: Locale = "en", t?: TFunction) {
+  return value ? formatTimestamp(value, locale, t) : t ? t("unknown") : "Unknown";
 }
 
-function formatLocalModified(value: string | null) {
-  return value ? formatTimestamp(value) : "No local copy";
+function formatLocalModified(value: string | null, locale: Locale = "en", t?: TFunction) {
+  return value ? formatTimestamp(value, locale, t) : t ? t("noLocalCopy") : "No local copy";
 }
 
-function formatMonitorTime(value: string | null) {
-  return value ? formatTimestamp(value) : "Not yet";
+function formatMonitorTime(value: string | null, locale: Locale = "en", t?: TFunction) {
+  return value ? formatTimestamp(value, locale, t) : t ? t("notYet") : "Not yet";
 }
 
-function formatLastUsed(lastUsedAt: string | null) {
+function formatLastUsed(lastUsedAt: string | null, locale: Locale = "en", t?: TFunction) {
   if (!lastUsedAt) {
-    return "Never";
+    return t ? t("never") : "Never";
   }
 
   const parsed = new Date(lastUsedAt);
@@ -3372,10 +3487,10 @@ function formatLastUsed(lastUsedAt: string | null) {
     return lastUsedAt;
   }
 
-  return `${parsed.toLocaleString()} (${formatAge(parsed)})`;
+  return `${parsed.toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} (${formatAge(parsed, t)})`;
 }
 
-function formatAge(date: Date): string {
+function formatAge(date: Date, t?: TFunction): string {
   const now = Date.now();
   const ageMs = Math.max(0, now - date.getTime());
   const minutes = Math.floor(ageMs / 60000);
@@ -3383,14 +3498,41 @@ function formatAge(date: Date): string {
   const days = Math.floor(hours / 24);
 
   if (days >= 1) {
-    return `${days} day${days === 1 ? "" : "s"} ago`;
+    return t ? t("dayAgo", { count: days, plural: days === 1 ? "" : "s" }) : `${days} day${days === 1 ? "" : "s"} ago`;
   }
 
   if (hours >= 1) {
-    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+    return t ? t("hourAgo", { count: hours, plural: hours === 1 ? "" : "s" }) : `${hours} hour${hours === 1 ? "" : "s"} ago`;
   }
 
-  return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  return t ? t("minuteAgo", { count: minutes, plural: minutes === 1 ? "" : "s" }) : `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+}
+
+function errorMessage(error: unknown, fallback: string, t: TFunction) {
+  if (!(error instanceof Error) || !error.message) {
+    return fallback;
+  }
+
+  return localizeServerError(error.message, t) ?? error.message;
+}
+
+function localizeServerError(message: string, t: TFunction): string | null {
+  if (message.startsWith("Cannot pull: sync repo has local uncommitted changes.")) {
+    const details = message.split("\n").slice(1).join("\n").trim();
+    return details ? `${t("cannotPullUncommittedChanges")}\n${details}` : t("cannotPullUncommittedChanges");
+  }
+
+  const autoResolvePrefix = "Cannot auto-resolve sync conflict. Review these paths manually:";
+  if (message.startsWith(autoResolvePrefix)) {
+    return t("cannotAutoResolveSyncConflict", { paths: message.slice(autoResolvePrefix.length).trim() });
+  }
+
+  const manualReviewPrefix = "Cannot resolve repository conflict. Review these paths manually:";
+  if (message.startsWith(manualReviewPrefix)) {
+    return t("cannotResolveRepoConflictManual", { paths: message.slice(manualReviewPrefix.length).trim() });
+  }
+
+  return null;
 }
 
 async function readError(response: Response) {

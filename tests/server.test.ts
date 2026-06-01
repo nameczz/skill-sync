@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { chmodSync, existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -48,7 +48,7 @@ describe("server", () => {
     }
   });
 
-  it("serves Codex archive list, preview, delete, and restore APIs", async () => {
+  it("serves Codex archive list, preview, delete, restore, and unarchive APIs", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "csm-server-codex-archive-api-"));
     process.env.CSM_CONFIG_DIR = path.join(root, "config");
     const codexHome = process.env.CODEX_HOME;
@@ -111,6 +111,17 @@ describe("server", () => {
       });
       expect(restoreResponse.ok).toBe(true);
       expect(existsSync(path.join(archiveRoot, fileName))).toBe(true);
+
+      const unarchiveResponse = await fetch(`${server.url}/api/codex-archive/unarchive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: "active", fileName })
+      });
+      const unarchivePayload = (await unarchiveResponse.json()) as { targetPath: string };
+      expect(unarchiveResponse.ok).toBe(true);
+      expect(unarchivePayload.targetPath).toBe(await realpath(path.join(codexHome, "sessions", "2026", "05", "14", fileName)));
+      expect(existsSync(path.join(archiveRoot, fileName))).toBe(false);
+      expect(existsSync(path.join(codexHome, "sessions", "2026", "05", "14", fileName))).toBe(true);
     } finally {
       await server.close();
     }

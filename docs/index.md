@@ -1,6 +1,6 @@
-# Codex Skill Manager
+# Skill Sync
 
-Local-first workbench for syncing Codex and Agents skills through a Git repository.
+Local-first workbench for syncing AI agent skills through a Git repository. It currently supports Codex and Agents skill folders.
 
 ## What It Does
 
@@ -16,6 +16,8 @@ Local-first workbench for syncing Codex and Agents skills through a Git reposito
 yarn install
 npm run dev -- serve
 ```
+
+After npm install, use `skill-sync serve`.
 
 Open `http://127.0.0.1:3017`.
 

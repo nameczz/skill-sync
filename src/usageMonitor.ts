@@ -15,7 +15,7 @@ type UsageMonitorOptions = {
 };
 
 export function createUsageMonitor(options: UsageMonitorOptions = {}): UsageMonitorController {
-  const intervalMs = options.intervalMs ?? 5000;
+  const intervalMs = options.intervalMs ?? 30_000;
   const scan =
     options.scan ??
     ((config: LocalConfig) =>

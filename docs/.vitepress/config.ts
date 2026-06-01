@@ -1,8 +1,8 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: "Codex Skill Manager",
-  description: "Local-first Git sync for Codex and Agents skills.",
+  title: "Skill Sync",
+  description: "Local-first Git sync for AI agent skills.",
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
@@ -23,6 +23,6 @@ export default defineConfig({
         items: [{ text: "API", link: "/reference/api" }]
       }
     ],
-    socialLinks: [{ icon: "github", link: "https://github.com/OWNER/codex-skill-manager" }]
+    socialLinks: [{ icon: "github", link: "https://github.com/nameczz/skill-sync" }]
   }
 });

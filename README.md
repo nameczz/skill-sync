@@ -1,116 +1,246 @@
-# Codex Skill Manager
+# Skill Sync
 
-[![CI](https://img.shields.io/github/actions/workflow/status/OWNER/codex-skill-manager/ci.yml?branch=main&label=CI)](./.github/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/nameczz/skill-sync/ci.yml?branch=main&label=CI)](./.github/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/skill-sync?label=npm)](https://www.npmjs.com/package/skill-sync)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933)](https://nodejs.org/)
 
-Local-first CLI + Web manager for syncing Codex skills with Git across machines.
+A local-first web and CLI workbench for syncing AI agent skills across machines with Git. It currently supports Codex and Agents skill folders, with room for more runtimes later.
 
-It focuses on safe, explicit operations between local skill directories and a dedicated sync repo, including Codex Archive workflows and auto-sync watching.
+Skills are just folders on your machine. That is great for hacking, but awkward once you have more than one computer, a growing skill library, or a mix of Codex and Agents skill directories. Skill Sync gives those folders a small control plane: choose what to track, keep local copies in sync, inspect conflicts, and push changes through your own Git repository.
+
+中文简介：Skill Sync 是一个本地优先的 skill 同步工具。你可以用自己的 Git 仓库在多台电脑之间同步 Codex / Agents skills，可视化查看本地/仓库差异、最近使用时间、Codex 归档会话，并支持自动同步。
 
 ## Screenshots
 
-> Placeholder images: replace these files with real captures from your environment.
+These are placeholders. Replace them with real screenshots before sharing a launch post or article.
 
-![Skills dashboard placeholder](docs/screenshots/dashboard-placeholder.svg)
-![Conflict resolution placeholder](docs/screenshots/conflict-placeholder.svg)
+| Skills dashboard | Conflict / compare flow |
+| --- | --- |
+| ![Skills dashboard placeholder](docs/screenshots/dashboard-placeholder.svg) | ![Conflict resolution placeholder](docs/screenshots/conflict-placeholder.svg) |
+
+Suggested real captures:
+- `docs/screenshots/skills-dashboard.png`
+- `docs/screenshots/codex-archive.png`
+- `docs/screenshots/compare-conflict.png`
+- `docs/screenshots/dark-mode.png`
+
+## What It Does
+
+- Tracks selected skills from `~/.codex/skills` and `~/.agents/skills`.
+- Syncs skill folders through a Git repository that you control.
+- Supports one-click add, install, update, stop syncing, and local delete flows.
+- Auto-syncs managed local skill changes and commits/pushes them to the sync repo.
+- Pulls remote changes from another machine and applies missing or updated skills locally.
+- Shows skill states such as in sync, local only, repo only, local changed, repo changed, and conflict.
+- Lets you compare versions and choose which copy should win when a skill conflicts.
+- Records skill usage from local Codex session traces and shows last-used time.
+- Includes a Codex Archive browser for archived sessions, with soft delete, restore, and unarchive.
+- Keeps machine-specific config and cache out of Git.
+
+## What It Does Not Do
+
+- It does not host your skills on a SaaS service.
+- It does not require a central backend beyond your own Git remote.
+- It does not delete local installed skill copies when you stop syncing a skill.
+- It does not change how Codex loads skills; Codex still reads local skill directories.
 
 ## Quick Start
 
-Prerequisites: Node.js `>=20`, Git, macOS (directory picker support is macOS-first).
+Prerequisites:
+
+- Node.js `>=20`
+- Git
+- macOS for the native directory picker
+- A local folder or Git clone to use as the sync repository
+
+Install from npm:
+
+```bash
+npm install -g skill-sync
+skill-sync serve
+```
+
+Or run from source:
 
 ```bash
 yarn install
-npm run dev -- init
 npm run dev -- serve
 ```
 
-Open `http://127.0.0.1:3017`.
+Open [http://127.0.0.1:3017](http://127.0.0.1:3017).
 
-Useful CLI commands:
+On first launch:
+
+1. Choose the Git sync repository directory.
+2. Initialize the manager.
+3. Add local-only skills to sync.
+4. Let auto-sync watch managed skills, or use manual actions when you want explicit control.
+
+## Common CLI Commands
 
 ```bash
-npm run dev -- status
-npm run dev -- pull
-npm run dev -- sync <skill-id>
-npm run dev -- update-local <skill-id>
-npm run dev -- stop-syncing <skill-id>
+skill-sync status
+skill-sync pull
+skill-sync sync <skill-id>
+skill-sync update-local <skill-id>
+skill-sync stop-syncing <skill-id>
+skill-sync serve --port 4100
 ```
 
-Documentation site:
+## Sync Model
+
+The sync repository stores shared state:
+
+```text
+skills/                 # tracked skill folders
+metadata/skills.json    # tracked skill metadata
+metadata/usage-events.jsonl
+.gitignore
+```
+
+Your machine keeps local-only state outside Git:
+
+```text
+~/.skill-sync/config.json
+~/.skill-sync/cache/
+```
+
+At a high level:
+
+```mermaid
+flowchart LR
+  Codex["~/.codex/skills"] --> Manager["Skill Sync"]
+  Agents["~/.agents/skills"] --> Manager
+  Manager --> Repo["Git sync repo"]
+  Repo --> GitHub["Your Git remote"]
+  Manager --> Archive["~/.codex/archived_sessions"]
+  Manager --> Cache["Local config/cache"]
+```
+
+## Typical Workflows
+
+**Add a local skill to sync**
+
+1. Open the Skills page.
+2. Find a `Local only` skill.
+3. Click `Add to sync`.
+4. The app copies it into the sync repo, updates metadata, commits, and pushes.
+
+**Use another machine**
+
+1. Clone or choose the same sync repository.
+2. Initialize Skill Sync with that repo path.
+3. Click `Pull`.
+4. Apply repo changes to install missing local copies.
+
+**Resolve a conflict**
+
+1. Open the compare dialog for the skill.
+2. Review the repo, Codex, and Agents versions.
+3. Accept the version you want to keep.
+4. The app updates metadata, commits, and pushes the resolution.
+
+## Codex Archive
+
+Codex App can archive sessions into `~/.codex/archived_sessions`. Skill Sync exposes those sessions in the web UI so you can:
+
+- Search archived sessions.
+- Preview metadata without loading the full file by default.
+- Move an archived session to Trash.
+- Restore from Trash.
+- Unarchive a session back into Codex sessions.
+
+## Documentation
+
+Local docs site:
 
 ```bash
 npm run docs:dev
 npm run docs:build
 ```
 
-## Architecture
+Useful docs:
 
-```mermaid
-flowchart LR
-  CLI["CLI (src/cli.ts)"] --> Core["Core Services (src/*.ts)"]
-  Web["Web UI (web/)"] --> Server["Fastify Server (src/server.ts)"]
-  Server --> Core
-  Core --> Codex["~/.codex/skills"]
-  Core --> Agents["~/.agents/skills"]
-  Core --> Repo["Git Sync Repo"]
-  Core --> Archive["Codex Archive Metadata"]
-  Core --> Watcher["Auto-Sync Watcher"]
+- [Getting Started](./docs/guide/getting-started.md)
+- [Sync Model](./docs/guide/sync-model.md)
+- [API Reference](./docs/reference/api.md)
+
+## Development
+
+Run checks:
+
+```bash
+npm run typecheck
+npm test
+npm run build
 ```
 
-Highlights:
-- Git-backed sync for Codex/Agents skills
-- Local manager for install/import/update/remove flows
-- Codex Archive support for tracking and recoverability
-- Auto-sync watching for managed skills
-- macOS directory picker during setup
-- Local-first: no remote SaaS dependency for core sync operations
+Run with isolated test paths:
+
+```bash
+SKILL_SYNC_REPO=/tmp/skill-sync-repo \
+SKILL_SYNC_CODEX_SKILLS_DIR=/tmp/skill-sync-codex \
+SKILL_SYNC_AGENTS_SKILLS_DIR=/tmp/skill-sync-agents \
+SKILL_SYNC_CONFIG_DIR=/tmp/skill-sync-config \
+SKILL_SYNC_CACHE_DIR=/tmp/skill-sync-cache \
+npm run dev -- serve
+```
+
+Legacy `CSM_*` environment variables and `~/.codex-skill-manager` config are still read for compatibility.
+
+## Publishing
+
+The npm package is published by `.github/workflows/publish-npm.yml` using npm Trusted Publishing, so no long-lived npm publish token is needed after the package exists on npm.
+
+1. Rename or create the GitHub repository that matches `package.json`'s `repository.url`.
+2. Publish `skill-sync@0.1.0` once manually if the package does not exist yet:
+   ```bash
+   npm login
+   npm publish
+   ```
+3. On npmjs.com, open the `skill-sync` package settings and add a Trusted Publisher:
+   - Provider: GitHub Actions
+   - Organization/user: `nameczz`
+   - Repository: `skill-sync`
+   - Workflow filename: `publish-npm.yml`
+   - Allowed action: `npm publish`
+4. Publish future versions with a GitHub Release, or run the `Publish npm` workflow manually with `dry-run` set to `false`.
+
+You can also configure the trusted publisher from the CLI after the first publish:
+
+```bash
+npm trust github skill-sync --repo nameczz/skill-sync --file publish-npm.yml --allow-publish
+```
+
+The workflow installs dependencies, runs typecheck, tests, build, `npm pack --dry-run`, then publishes with OIDC-backed npm provenance.
 
 ## Project Structure
 
 ```text
-codex-skill-manager/
-├── src/                # CLI, sync, git, archive, watcher, server
+skill-sync/
+├── src/                # CLI, sync, git, archive, usage scanner, server
 ├── web/                # local management UI
-├── tests/              # vitest coverage
-├── docs/               # screenshots, extra docs
-├── .github/            # issue/PR templates and CI workflow
+├── tests/              # Vitest coverage
+├── docs/               # docs and screenshot placeholders
+├── .github/            # CI workflows and GitHub metadata
 └── README.md
-```
-
-## FAQ / Troubleshooting
-
-**Q: Why does first launch ask for a directory?**  
-A: The app needs a dedicated Git sync repo. On macOS, the directory picker selects and stores this location locally.
-
-**Q: I changed a skill, but nothing was pushed.**  
-A: Check auto-sync watching status. If watching is disabled, run manual `sync`.
-
-**Q: How do I avoid touching my real skill folders while testing?**  
-A: Start with isolated env paths:
-
-```bash
-CSM_SYNC_REPO=/tmp/csm-sync \
-CSM_CODEX_SKILLS_DIR=/tmp/csm-codex \
-CSM_AGENTS_SKILLS_DIR=/tmp/csm-agents \
-CSM_CONFIG_DIR=/tmp/csm-config \
-CSM_CACHE_DIR=/tmp/csm-cache \
-npm run dev -- serve
-```
-
-**Q: Port `3017` is occupied.**  
-A: Start on another port:
-
-```bash
-npm run dev -- serve --port 4100
 ```
 
 ## Contributing
 
-Please read:
-- [CONTRIBUTING.md](./CONTRIBUTING.md)
-- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
-- [SECURITY.md](./SECURITY.md)
-- [CHANGELOG.md](./CHANGELOG.md)
+Issues and pull requests are welcome. No special template is required; a clear description, reproduction steps for bugs, and screenshots or logs when relevant are enough.
 
-Bug reports and feature requests are welcome in GitHub Issues.
+Before opening a PR, please run:
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md), [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), and [SECURITY.md](./SECURITY.md) for project expectations.
+
+## License
+
+MIT. See [LICENSE](./LICENSE).

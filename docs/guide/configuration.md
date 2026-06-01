@@ -1,6 +1,6 @@
 # Configuration
 
-Codex Skill Manager stores machine-local configuration outside the sync repository.
+Skill Sync stores machine-local configuration outside the sync repository.
 
 ## Paths
 
@@ -18,13 +18,15 @@ The sync repository is the only folder intended for Git commits. The cache direc
 For isolated tests, use temporary paths:
 
 ```bash
-CSM_SYNC_REPO=/tmp/csm-sync \
-CSM_CODEX_SKILLS_DIR=/tmp/csm-codex \
-CSM_AGENTS_SKILLS_DIR=/tmp/csm-agents \
-CSM_CONFIG_DIR=/tmp/csm-config \
-CSM_CACHE_DIR=/tmp/csm-cache \
+SKILL_SYNC_REPO=/tmp/skill-sync-repo \
+SKILL_SYNC_CODEX_SKILLS_DIR=/tmp/skill-sync-codex \
+SKILL_SYNC_AGENTS_SKILLS_DIR=/tmp/skill-sync-agents \
+SKILL_SYNC_CONFIG_DIR=/tmp/skill-sync-config \
+SKILL_SYNC_CACHE_DIR=/tmp/skill-sync-cache \
 npm run dev -- serve
 ```
+
+Legacy `CSM_*` environment variables are still supported for existing local setups.
 
 ## Git Remote
 

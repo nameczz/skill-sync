@@ -6,12 +6,14 @@ import { describe, expect, it } from "vitest";
 import { ensureRepoMetadata, readSkillsMetadata } from "../src/metadata.js";
 
 describe("repo metadata", () => {
-  it("ignores local Skill Manager cache inside the sync repo", async () => {
+  it("ignores local Skill Sync cache inside the sync repo", async () => {
     const syncRepo = await mkdtemp(path.join(tmpdir(), "csm-metadata-"));
 
     await ensureRepoMetadata(syncRepo);
 
-    await expect(readFile(path.join(syncRepo, ".gitignore"), "utf8")).resolves.toContain(".codex-skill-manager/");
+    const gitignore = await readFile(path.join(syncRepo, ".gitignore"), "utf8");
+    expect(gitignore).toContain(".skill-sync/");
+    expect(gitignore).toContain(".codex-skill-manager/");
     expect(existsSync(path.join(syncRepo, "archive"))).toBe(false);
   });
 
@@ -22,9 +24,7 @@ describe("repo metadata", () => {
 
     await ensureRepoMetadata(syncRepo);
 
-    await expect(readFile(path.join(syncRepo, ".gitignore"), "utf8")).resolves.toBe(
-      "node_modules/\n.codex-skill-manager/\n"
-    );
+    await expect(readFile(path.join(syncRepo, ".gitignore"), "utf8")).resolves.toBe("node_modules/\n.skill-sync/\n.codex-skill-manager/\n");
   });
 
   it("normalizes older skill metadata records", async () => {

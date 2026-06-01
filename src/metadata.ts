@@ -50,21 +50,23 @@ export async function ensureRepoMetadata(syncRepo: string): Promise<void> {
 
 async function ensureGitignore(syncRepo: string): Promise<void> {
   const gitignorePath = path.join(syncRepo, ".gitignore");
-  const localCachePattern = ".codex-skill-manager/";
+  const localCachePattern = ".skill-sync/";
+  const legacyLocalCachePattern = ".codex-skill-manager/";
 
   if (!existsSync(gitignorePath)) {
-    await writeFile(gitignorePath, `${localCachePattern}\n`, "utf8");
+    await writeFile(gitignorePath, `${localCachePattern}\n${legacyLocalCachePattern}\n`, "utf8");
     return;
   }
 
   const current = await readFile(gitignorePath, "utf8");
   const lines = current.split(/\r?\n/).map((line) => line.trim());
-  if (lines.includes(localCachePattern)) {
+  const missingPatterns = [localCachePattern, legacyLocalCachePattern].filter((pattern) => !lines.includes(pattern));
+  if (missingPatterns.length === 0) {
     return;
   }
 
   const separator = current.endsWith("\n") || current.length === 0 ? "" : "\n";
-  await writeFile(gitignorePath, `${current}${separator}${localCachePattern}\n`, "utf8");
+  await writeFile(gitignorePath, `${current}${separator}${missingPatterns.join("\n")}\n`, "utf8");
 }
 
 export async function readSkillsMetadata(syncRepo: string): Promise<SkillsMetadata> {

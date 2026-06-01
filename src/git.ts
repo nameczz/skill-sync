@@ -115,9 +115,9 @@ export async function gitHasStagedChanges(syncRepo: string): Promise<boolean> {
 export async function gitCommit(syncRepo: string, message: string): Promise<string> {
   await runGit(syncRepo, [
     "-c",
-    "user.name=Codex Skill Manager",
+    "user.name=Skill Sync",
     "-c",
-    "user.email=codex-skill-manager@local",
+    "user.email=skill-sync@local",
     "commit",
     "-m",
     message

@@ -14,6 +14,7 @@ const INITIAL_SCAN_BYTES = 5 * 1024 * 1024;
 const MAX_SEEN_KEYS = 1000;
 const MAX_SESSION_FILES = 20;
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const INITIAL_RECENT_WINDOW_MS = 7 * RECENT_WINDOW_MS;
 
 type SessionUsageState = {
   schemaVersion: 2;
@@ -34,12 +35,15 @@ type SessionUsageOptions = PathOptions & {
 };
 
 export async function recordUsageFromCodexSessions(config: LocalConfig, options: SessionUsageOptions = {}): Promise<SessionRecordResult> {
-  const files = await findCandidateSessionFiles(options);
+  const { state, isInitialScan } = await readSessionState(config.cacheDir);
+  const files = await findCandidateSessionFiles(options, {
+    maxSessionFiles: isInitialScan ? Number.POSITIVE_INFINITY : MAX_SESSION_FILES,
+    recentWindowMs: isInitialScan ? INITIAL_RECENT_WINDOW_MS : RECENT_WINDOW_MS
+  });
   if (files.length === 0) {
     return { scannedFiles: 0, recorded: 0, skillIds: [] };
   }
 
-  const state = await readSessionState(config.cacheDir);
   const seen = new Set(state.seen);
   const existingEvents = new Set((await readUsageEvents(config.syncRepo)).map((event) => `${event.skillId}:${event.invokedAt}`));
   const recordedSkillIds = new Set<string>();
@@ -90,10 +94,13 @@ export async function recordUsageFromCodexSessions(config: LocalConfig, options:
   };
 }
 
-async function findCandidateSessionFiles(options: SessionUsageOptions): Promise<string[]> {
+async function findCandidateSessionFiles(
+  options: SessionUsageOptions,
+  scanPolicy: { maxSessionFiles: number; recentWindowMs: number }
+): Promise<string[]> {
   const env = options.env ?? process.env;
   const home = options.homeDir ?? homedir();
-  const codexHome = path.resolve(expandHome(env.CSM_CODEX_HOME ?? env.CODEX_HOME ?? "~/.codex", home));
+  const codexHome = path.resolve(expandHome(env.SKILL_SYNC_CODEX_HOME ?? env.CSM_CODEX_HOME ?? env.CODEX_HOME ?? "~/.codex", home));
   const sessionsDir = path.join(codexHome, "sessions");
 
   if (!existsSync(sessionsDir)) {
@@ -103,7 +110,7 @@ async function findCandidateSessionFiles(options: SessionUsageOptions): Promise<
   const allFiles = await listJsonlFiles(sessionsDir);
   const threadId = options.threadId === undefined ? env.CODEX_THREAD_ID : options.threadId ?? undefined;
   const now = options.now ?? (() => new Date());
-  const cutoff = now().getTime() - RECENT_WINDOW_MS;
+  const cutoff = now().getTime() - scanPolicy.recentWindowMs;
 
   const candidates = await Promise.all(
     allFiles.map(async (filePath) => {
@@ -120,7 +127,7 @@ async function findCandidateSessionFiles(options: SessionUsageOptions): Promise<
     .filter((entry): entry is { filePath: string; mtimeMs: number } => entry !== null)
     .filter((entry) => (threadId ? path.basename(entry.filePath).includes(threadId) : entry.mtimeMs >= cutoff))
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
-    .slice(0, MAX_SESSION_FILES)
+    .slice(0, scanPolicy.maxSessionFiles)
     .map((entry) => entry.filePath);
 }
 
@@ -199,23 +206,23 @@ function toSessionUsageSignals(line: string, config: LocalConfig): Array<{ times
   return [];
 }
 
-async function readSessionState(cacheDir: string): Promise<SessionUsageState> {
+async function readSessionState(cacheDir: string): Promise<{ state: SessionUsageState; isInitialScan: boolean }> {
   const filePath = path.join(cacheDir, STATE_FILE);
   const raw = await readFile(filePath, "utf8").catch(() => "");
   if (!raw.trim()) {
-    return { schemaVersion: STATE_SCHEMA_VERSION, files: {}, seen: [] };
+    return { state: { schemaVersion: STATE_SCHEMA_VERSION, files: {}, seen: [] }, isInitialScan: true };
   }
 
   try {
     const parsed = JSON.parse(raw) as SessionUsageState;
     if (parsed.schemaVersion === STATE_SCHEMA_VERSION && parsed.files && typeof parsed.files === "object" && Array.isArray(parsed.seen)) {
-      return parsed;
+      return { state: parsed, isInitialScan: false };
     }
   } catch {
     // Ignore corrupt local cache and rebuild it from current session tails.
   }
 
-  return { schemaVersion: STATE_SCHEMA_VERSION, files: {}, seen: [] };
+  return { state: { schemaVersion: STATE_SCHEMA_VERSION, files: {}, seen: [] }, isInitialScan: true };
 }
 
 async function writeSessionState(cacheDir: string, state: SessionUsageState): Promise<void> {

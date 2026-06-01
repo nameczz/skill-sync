@@ -29,6 +29,11 @@ export type CodexArchivePreviewResponse = {
   truncated: boolean;
 };
 
+export type CodexArchiveUnarchiveResponse = {
+  item: CodexArchiveSession;
+  targetPath: string;
+};
+
 type SessionIndexEntry = {
   id?: unknown;
   thread_id?: unknown;
@@ -55,12 +60,14 @@ const PREVIEW_MAX_LINES = 120;
 const JSONL_EXT = ".jsonl";
 const MAX_SESSION_ENTRIES = 250;
 
-export function resolveCodexArchiveRoots(options: PathOptions = {}): { active: string; trash: string; index: string } {
+export function resolveCodexArchiveRoots(options: PathOptions = {}): { active: string; trash: string; index: string; sessions: string } {
   const archiveRoot = getDefaultCodexArchiveSessionsDir(options);
+  const codexHome = path.dirname(archiveRoot);
   return {
     active: archiveRoot,
     trash: path.join(archiveRoot, ".trash"),
-    index: path.join(path.dirname(archiveRoot), "session_index.jsonl")
+    index: path.join(codexHome, "session_index.jsonl"),
+    sessions: path.join(codexHome, "sessions")
   };
 }
 
@@ -72,7 +79,7 @@ export async function listCodexArchiveSessions(state: CodexArchiveState, options
 
   const items = (
     await Promise.all(rows.map((fileName) => buildSessionMetadata(fileName, state, index, options)))
-  ).sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  ).sort(compareMostRecentSessionDesc);
 
   return {
     state,
@@ -126,6 +133,21 @@ export async function restoreCodexArchiveSession(fileName: string, options: Path
 
   await rename(sourcePath, targetPath);
   return await buildSessionMetadata(safe, "active", await readSessionIndex(roots.index), options);
+}
+
+export async function unarchiveCodexArchiveSession(fileName: string, options: PathOptions = {}): Promise<CodexArchiveUnarchiveResponse> {
+  const roots = resolveCodexArchiveRoots(options);
+  const safe = validateCodexArchiveFileName(fileName);
+  const sourcePath = await resolveSessionFilePath(roots.active, safe, { mustExist: true });
+  const item = await buildSessionMetadata(safe, "active", await readSessionIndex(roots.index), options);
+  const targetPath = await resolveUnarchivedSessionPath(roots.sessions, safe, item.updatedAt ?? item.archivedAt);
+
+  if (existsSync(targetPath)) {
+    throw new Error(`Session file already exists outside archive: ${safe}`);
+  }
+
+  await rename(sourcePath, targetPath);
+  return { item, targetPath };
 }
 
 export function validateCodexArchiveFileName(fileName: string): string {
@@ -260,6 +282,53 @@ async function resolveSessionFilePath(
 function isInDirectory(root: string, target: string): boolean {
   const relative = path.relative(root, target);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+async function resolveUnarchivedSessionPath(sessionsRoot: string, fileName: string, fallbackTimestamp: string | null): Promise<string> {
+  const safe = validateCodexArchiveFileName(fileName);
+  const dateParts = sessionDateParts(safe, fallbackTimestamp);
+  const resolvedRoot = path.resolve(sessionsRoot);
+  const targetDir = path.join(resolvedRoot, dateParts.year, dateParts.month, dateParts.day);
+  const resolvedTargetDir = path.resolve(targetDir);
+  const relativeDir = path.relative(resolvedRoot, resolvedTargetDir);
+  if (relativeDir.startsWith("..") || path.isAbsolute(relativeDir)) {
+    throw new Error(`Unarchived session must remain in Codex sessions root: ${safe}`);
+  }
+
+  await mkdir(resolvedTargetDir, { recursive: true });
+
+  const realRoot = await realpath(resolvedRoot).catch(() => resolvedRoot);
+  const realTargetDir = await realpath(resolvedTargetDir);
+  if (!isInDirectory(realRoot, realTargetDir)) {
+    throw new Error(`Unarchived session must remain in Codex sessions root: ${safe}`);
+  }
+
+  const targetPath = path.join(realTargetDir, safe);
+  if (!isInDirectory(realRoot, targetPath)) {
+    throw new Error(`Unarchived session must remain in Codex sessions root: ${safe}`);
+  }
+
+  return targetPath;
+}
+
+function sessionDateParts(fileName: string, fallbackTimestamp: string | null): { year: string; month: string; day: string } {
+  const fromFileName = fileName.match(/^rollout-(\d{4})-(\d{2})-(\d{2})T/);
+  if (fromFileName) {
+    return { year: fromFileName[1], month: fromFileName[2], day: fromFileName[3] };
+  }
+
+  const fallback = fallbackTimestamp ? new Date(fallbackTimestamp) : null;
+  const date = fallback && !Number.isNaN(fallback.getTime()) ? fallback : new Date();
+  const [year, month, day] = date.toISOString().slice(0, 10).split("-");
+  return { year, month, day };
+}
+
+function compareMostRecentSessionDesc(a: CodexArchiveSession, b: CodexArchiveSession): number {
+  return sessionSortTimestamp(b) - sessionSortTimestamp(a) || a.title.localeCompare(b.title) || a.sessionId.localeCompare(b.sessionId);
+}
+
+function sessionSortTimestamp(item: CodexArchiveSession): number {
+  return Date.parse(item.updatedAt ?? item.archivedAt ?? "") || 0;
 }
 
 async function readSessionPreview(filePath: string): Promise<{ lines: string[]; truncated: boolean }> {

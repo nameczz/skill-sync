@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "./ui/button";
+import { makeT, readInitialLocale } from "../i18n";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -20,13 +21,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Codex Skill Manager UI crashed.", error, info);
+    console.error("Skill Sync UI crashed.", error, info);
   }
 
   render() {
     if (!this.state.error) {
       return this.props.children;
     }
+    const t = makeT(readInitialLocale());
 
     return (
       <main className="error-boundary" role="alert">
@@ -35,12 +37,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <CircleAlert size={18} aria-hidden="true" />
           </span>
           <div>
-            <p className="eyebrow">UI error</p>
-            <h1>Something went wrong</h1>
-            <p>{this.state.error.message || "The interface hit an unexpected error."}</p>
+            <p className="eyebrow">{t("uiError")}</p>
+            <h1>{t("somethingWentWrong")}</h1>
+            <p>{this.state.error.message || t("interfaceError")}</p>
             <Button type="button" variant="primary" onClick={() => window.location.reload()}>
               <RefreshCw size={15} aria-hidden="true" />
-              Reload
+              {t("reload")}
             </Button>
           </div>
         </div>

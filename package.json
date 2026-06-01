@@ -1,11 +1,30 @@
 {
-  "name": "codex-skill-manager",
+  "name": "skill-sync",
   "version": "0.1.0",
-  "description": "Local Web and CLI manager for syncing Codex skills through Git.",
+  "description": "Local-first Web and CLI workbench for syncing AI agent skills through Git.",
   "type": "module",
   "packageManager": "yarn@1.22.22",
   "bin": {
-    "skill-manager": "./dist/src/cli.js"
+    "skill-sync": "dist/src/cli.js",
+    "skill-manager": "dist/src/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/nameczz/skill-sync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nameczz/skill-sync/issues"
+  },
+  "homepage": "https://github.com/nameczz/skill-sync#readme",
+  "keywords": [
+    "codex",
+    "skills",
+    "agents",
+    "sync",
+    "git"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",
@@ -13,7 +32,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run build:server && npm run build:web",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && npm run build:server && npm run build:web",
     "build:server": "tsc -p tsconfig.json",
     "build:web": "vite build",
     "dev": "tsx src/cli.ts",

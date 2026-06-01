@@ -1,6 +1,6 @@
-# Contributing to Codex Skill Manager
+# Contributing to Skill Sync
 
-Thanks for helping improve Codex Skill Manager.
+Thanks for helping improve Skill Sync.
 
 ## Development Setup
 
@@ -41,9 +41,7 @@ npm run build
 
 ## Reporting Bugs and Requesting Features
 
-Please use the provided issue templates:
-- Bug report
-- Feature request
+Open a GitHub Issue with a clear summary. For bugs, include reproduction steps, expected behavior, actual behavior, and logs or screenshots when useful. For feature requests, describe the workflow you want to improve and any constraints you care about.
 
 ## Community Standards
 

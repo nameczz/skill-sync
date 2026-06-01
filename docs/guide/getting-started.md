@@ -7,15 +7,17 @@
 - macOS for the native directory picker
 - A local folder or Git clone to use as the skill sync repository
 
-## Install
+## Install from npm
+
+```bash
+npm install -g skill-sync
+skill-sync serve
+```
+
+## Run from Source
 
 ```bash
 yarn install
-```
-
-## Run the Local Web UI
-
-```bash
 npm run dev -- serve
 ```
 
@@ -31,9 +33,9 @@ The server listens on `http://127.0.0.1:3017` by default.
 ## Common Commands
 
 ```bash
-npm run dev -- status
-npm run dev -- pull
-npm run dev -- sync <skill-id>
-npm run dev -- update-local <skill-id>
-npm run dev -- stop-syncing <skill-id>
+skill-sync status
+skill-sync pull
+skill-sync sync <skill-id>
+skill-sync update-local <skill-id>
+skill-sync stop-syncing <skill-id>
 ```

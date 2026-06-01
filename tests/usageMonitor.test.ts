@@ -6,6 +6,12 @@ import { createUsageMonitor } from "../src/usageMonitor.js";
 import type { LocalConfig } from "../src/types.js";
 
 describe("usage monitor", () => {
+  it("defaults to a 30-second scan interval", () => {
+    const monitor = createUsageMonitor();
+
+    expect(monitor.getStatus().intervalMs).toBe(30_000);
+  });
+
   it("runs an immediate scan and reports listener status", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "csm-usage-monitor-"));
     const config = configFor(root);

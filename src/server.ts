@@ -31,6 +31,7 @@ import {
   listCodexArchiveSessions,
   previewCodexArchiveSession,
   restoreCodexArchiveSession,
+  unarchiveCodexArchiveSession,
   moveCodexArchiveSessionToTrash,
   validateCodexArchiveFileName
 } from "./codexArchive.js";
@@ -324,6 +325,16 @@ export async function startServer(options: ServerOptions = {}): Promise<{ url: s
     return { state: "active", item };
   });
 
+  app.post<{ Body: CodexArchiveActionBody }>("/api/codex-archive/unarchive", async (request) => {
+    const state = request.body?.state === "trash" ? "trash" : "active";
+    if (state !== "active") {
+      throw httpError(400, "Unarchive only supports state=active.");
+    }
+    const fileName = requireArchiveFileName(request.body?.fileName);
+    const payload = await unarchiveCodexArchiveSession(fileName);
+    return { state: "sessions", ...payload };
+  });
+
   app.post<{ Body: { skillId?: string; invokedAt?: string } }>("/api/record", async (request) => {
     const loaded = requireConfig(config);
     const skillId = requireSkillId(request.body);
@@ -420,7 +431,7 @@ export async function startServer(options: ServerOptions = {}): Promise<{ url: s
   } else {
     app.get("/", async (_request, reply) => {
       reply.type("text/html").send(
-        "<main style=\"font-family: sans-serif; padding: 32px\"><h1>Codex Skill Manager</h1><p>Web assets are not built yet. Run <code>npm run build</code> first.</p></main>"
+        "<main style=\"font-family: sans-serif; padding: 32px\"><h1>Skill Sync</h1><p>Web assets are not built yet. Run <code>npm run build</code> first.</p></main>"
       );
     });
   }
@@ -442,7 +453,7 @@ export async function startServer(options: ServerOptions = {}): Promise<{ url: s
 
 function requireConfig(config: LocalConfig | null): LocalConfig {
   if (!config) {
-    throw httpError(409, "Codex Skill Manager is not initialized.");
+    throw httpError(409, "Skill Sync is not initialized.");
   }
 
   return config;

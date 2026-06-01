@@ -24,10 +24,11 @@ describe("skill id validation", () => {
   });
 
   it("defaults cache under the local app cache directory", () => {
-    expect(getDefaultCacheDir({ homeDir: "/Users/tester", env: {} })).toBe("/Users/tester/.codex-skill-manager/cache");
+    expect(getDefaultCacheDir({ homeDir: "/Users/tester", env: {} })).toBe("/Users/tester/.skill-sync/cache");
     expect(getDefaultCacheDir({ env: { CSM_CONFIG_DIR: "/tmp/csm-config" }, homeDir: "/Users/tester" })).toBe(
-      "/Users/tester/.codex-skill-manager/cache"
+      "/Users/tester/.skill-sync/cache"
     );
+    expect(getDefaultCacheDir({ env: { SKILL_SYNC_CACHE_DIR: "/tmp/skill-sync-cache" } })).toBe("/tmp/skill-sync-cache");
     expect(getDefaultCacheDir({ env: { CSM_CACHE_DIR: "/tmp/csm-cache" } })).toBe("/tmp/csm-cache");
   });
 
@@ -36,5 +37,8 @@ describe("skill id validation", () => {
     expect(getDefaultAgentsSkillsDir({ homeDir: "/Users/tester", env: { CSM_AGENTS_SKILLS_DIR: "/tmp/agents" } })).toBe(
       "/tmp/agents"
     );
+    expect(
+      getDefaultAgentsSkillsDir({ homeDir: "/Users/tester", env: { SKILL_SYNC_AGENTS_SKILLS_DIR: "/tmp/skill-sync-agents" } })
+    ).toBe("/tmp/skill-sync-agents");
   });
 });

@@ -21,31 +21,37 @@ export function expandHome(input: string, homeDir = homedir()): string {
 export function getDefaultConfigDir(options: PathOptions = {}): string {
   const env = options.env ?? process.env;
   const home = options.homeDir ?? homedir();
+  return path.resolve(expandHome(env.SKILL_SYNC_CONFIG_DIR ?? env.CSM_CONFIG_DIR ?? "~/.skill-sync", home));
+}
+
+export function getLegacyConfigDir(options: PathOptions = {}): string {
+  const env = options.env ?? process.env;
+  const home = options.homeDir ?? homedir();
   return path.resolve(expandHome(env.CSM_CONFIG_DIR ?? "~/.codex-skill-manager", home));
 }
 
 export function getDefaultCacheDir(options: PathOptions = {}): string {
   const env = options.env ?? process.env;
   const home = options.homeDir ?? homedir();
-  return path.resolve(expandHome(env.CSM_CACHE_DIR ?? "~/.codex-skill-manager/cache", home));
+  return path.resolve(expandHome(env.SKILL_SYNC_CACHE_DIR ?? env.CSM_CACHE_DIR ?? "~/.skill-sync/cache", home));
 }
 
 export function getDefaultSyncRepo(options: PathOptions = {}): string {
   const env = options.env ?? process.env;
   const home = options.homeDir ?? homedir();
-  return path.resolve(expandHome(env.CSM_SYNC_REPO ?? "~/codex-skills-sync", home));
+  return path.resolve(expandHome(env.SKILL_SYNC_REPO ?? env.CSM_SYNC_REPO ?? "~/skill-sync", home));
 }
 
 export function getDefaultCodexSkillsDir(options: PathOptions = {}): string {
   const env = options.env ?? process.env;
   const home = options.homeDir ?? homedir();
-  return path.resolve(expandHome(env.CSM_CODEX_SKILLS_DIR ?? "~/.codex/skills", home));
+  return path.resolve(expandHome(env.SKILL_SYNC_CODEX_SKILLS_DIR ?? env.CSM_CODEX_SKILLS_DIR ?? "~/.codex/skills", home));
 }
 
 export function getDefaultAgentsSkillsDir(options: PathOptions = {}): string {
   const env = options.env ?? process.env;
   const home = options.homeDir ?? homedir();
-  return path.resolve(expandHome(env.CSM_AGENTS_SKILLS_DIR ?? "~/.agents/skills", home));
+  return path.resolve(expandHome(env.SKILL_SYNC_AGENTS_SKILLS_DIR ?? env.CSM_AGENTS_SKILLS_DIR ?? "~/.agents/skills", home));
 }
 
 export function configFilePath(configDir: string): string {
@@ -63,7 +69,7 @@ export function repoMetadataDir(syncRepo: string): string {
 export function getDefaultCodexArchiveSessionsDir(options: PathOptions = {}): string {
   const env = options.env ?? process.env;
   const home = options.homeDir ?? homedir();
-  const codexHome = path.resolve(expandHome(env.CSM_CODEX_HOME ?? env.CODEX_HOME ?? "~/.codex", home));
+  const codexHome = path.resolve(expandHome(env.SKILL_SYNC_CODEX_HOME ?? env.CSM_CODEX_HOME ?? env.CODEX_HOME ?? "~/.codex", home));
   return path.join(codexHome, "archived_sessions");
 }
 
