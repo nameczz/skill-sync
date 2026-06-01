@@ -105,3 +105,12 @@ Prefer `rg` or `rg --files` for searching. Use `apply_patch` for manual edits.
 - Do not push, tag, publish to npm, or create releases without explicit user instruction.
 - Do not change git config unless explicitly requested.
 - Commit messages, when requested, must explain why, not only what.
+
+
+<claude-mem-context>
+# Memory Context
+
+# [codex-skill-manager] recent context, 2026-05-27 10:23pm GMT+8
+
+No previous sessions found.
+</claude-mem-context>
