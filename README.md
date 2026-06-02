@@ -1,7 +1,7 @@
 # Skill Sync
 
 [![CI](https://img.shields.io/github/actions/workflow/status/nameczz/skill-sync/ci.yml?branch=main&label=CI)](./.github/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/skill-sync?label=npm)](https://www.npmjs.com/package/skill-sync)
+[![npm](https://img.shields.io/npm/v/@nameczz/skill-sync?label=npm)](https://www.npmjs.com/package/@nameczz/skill-sync)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933)](https://nodejs.org/)
 
@@ -57,7 +57,7 @@ Prerequisites:
 Install from npm:
 
 ```bash
-npm install -g skill-sync
+npm install -g @nameczz/skill-sync
 skill-sync serve
 ```
 
@@ -194,12 +194,12 @@ Legacy `CSM_*` environment variables and `~/.codex-skill-manager` config are sti
 The npm package is published by `.github/workflows/publish-npm.yml` using npm Trusted Publishing, so no long-lived npm publish token is needed after the package exists on npm.
 
 1. Rename or create the GitHub repository that matches `package.json`'s `repository.url`.
-2. Publish `skill-sync@0.1.0` once manually if the package does not exist yet:
+2. Publish `@nameczz/skill-sync@0.1.0` once manually if the package does not exist yet:
    ```bash
    npm login
-   npm publish
+   npm publish --access=public
    ```
-3. On npmjs.com, open the `skill-sync` package settings and add a Trusted Publisher:
+3. On npmjs.com, open the `@nameczz/skill-sync` package settings and add a Trusted Publisher:
    - Provider: GitHub Actions
    - Organization/user: `nameczz`
    - Repository: `skill-sync`
@@ -210,7 +210,7 @@ The npm package is published by `.github/workflows/publish-npm.yml` using npm Tr
 You can also configure the trusted publisher from the CLI after the first publish:
 
 ```bash
-npm trust github skill-sync --repo nameczz/skill-sync --file publish-npm.yml --allow-publish
+npm trust github @nameczz/skill-sync --repo nameczz/skill-sync --file publish-npm.yml --allow-publish
 ```
 
 The workflow installs dependencies, runs typecheck, tests, build, `npm pack --dry-run`, then publishes with OIDC-backed npm provenance.

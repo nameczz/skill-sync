@@ -10,7 +10,7 @@
 ## Install from npm
 
 ```bash
-npm install -g skill-sync
+npm install -g @nameczz/skill-sync
 skill-sync serve
 ```
 
