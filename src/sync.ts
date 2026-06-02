@@ -249,7 +249,7 @@ async function resolveRepositoryConflictsNow(config: LocalConfig, resolutions: R
 
   try {
     try {
-      await runGit(config.syncRepo, ["merge", "--no-ff", "--no-commit", gitBranchStatus.upstream]);
+      await runGit(config.syncRepo, withSkillSyncGitIdentity(["merge", "--no-ff", "--no-commit", gitBranchStatus.upstream]));
     } catch (error) {
       if (!(await isMergeInProgress(config.syncRepo))) {
         throw error;
@@ -306,7 +306,7 @@ async function mergeRemoteRepositoryChanges(config: LocalConfig, upstream: strin
   );
 
   try {
-    await runGit(config.syncRepo, ["merge", "--no-ff", "--no-commit", upstream]);
+    await runGit(config.syncRepo, withSkillSyncGitIdentity(["merge", "--no-ff", "--no-commit", upstream]));
   } catch (error) {
     if (!(await isMergeInProgress(config.syncRepo))) {
       throw error;
@@ -689,7 +689,7 @@ async function previewMergeConflictPaths(syncRepo: string, upstream: string): Pr
   try {
     await runGit(syncRepo, ["worktree", "add", "--detach", tempDir, "HEAD"]);
     try {
-      await runGit(tempDir, ["merge", "--no-ff", "--no-commit", upstream]);
+      await runGit(tempDir, withSkillSyncGitIdentity(["merge", "--no-ff", "--no-commit", upstream]));
     } catch {
       // Conflicts are expected; inspect the preview worktree status below.
     }
@@ -697,6 +697,10 @@ async function previewMergeConflictPaths(syncRepo: string, upstream: string): Pr
   } finally {
     await removeWorktree(syncRepo, tempDir);
   }
+}
+
+function withSkillSyncGitIdentity(args: string[]): string[] {
+  return ["-c", "user.name=Skill Sync", "-c", "user.email=skill-sync@local", ...args];
 }
 
 async function buildRepositorySkillConflicts(config: LocalConfig, upstream: string, conflictPaths: string[]): Promise<RepositorySkillConflict[]> {

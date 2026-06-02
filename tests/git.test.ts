@@ -21,6 +21,7 @@ describe("gitPush", () => {
     await ensureGitRepository(syncRepo);
     await execFileAsync("git", ["-C", syncRepo, "branch", "-M", "main"]);
     await execFileAsync("git", ["init", "--bare", remote]);
+    await execFileAsync("git", ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"]);
     await execFileAsync("git", ["-C", syncRepo, "remote", "add", "origin", remote]);
 
     await writeFile(path.join(syncRepo, filePath), "base\n", "utf8");
@@ -66,6 +67,7 @@ describe("gitPush", () => {
     await ensureGitRepository(syncRepo);
     await execFileAsync("git", ["-C", syncRepo, "branch", "-M", "main"]);
     await execFileAsync("git", ["init", "--bare", remote]);
+    await execFileAsync("git", ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"]);
     await execFileAsync("git", ["-C", syncRepo, "remote", "add", "origin", remote]);
 
     await writeFile(path.join(syncRepo, filePath), "base\n", "utf8");
