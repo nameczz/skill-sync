@@ -48,6 +48,20 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Check GitHub Pages
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" >/dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages is enabled; deploying docs."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages is not enabled; skipping docs deployment."
+          fi
+
       - name: Deploy to GitHub Pages
+        if: ${{ steps.pages.outputs.enabled == 'true' }}
         id: deployment
         uses: actions/deploy-pages@v4

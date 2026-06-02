@@ -148,7 +148,7 @@ export async function gitPush(syncRepo: string): Promise<void> {
 
     await runGit(syncRepo, ["fetch", "--prune", remote]);
     try {
-      await runGit(syncRepo, ["rebase", `${remote}/${branch}`]);
+      await runGit(syncRepo, withSkillSyncGitIdentity(["rebase", `${remote}/${branch}`]));
     } catch (rebaseError) {
       await safeAbortRebase(syncRepo);
       throw new Error(
@@ -159,6 +159,10 @@ export async function gitPush(syncRepo: string): Promise<void> {
 
     await runGit(syncRepo, pushArgs);
   }
+}
+
+function withSkillSyncGitIdentity(args: string[]): string[] {
+  return ["-c", "user.name=Skill Sync", "-c", "user.email=skill-sync@local", ...args];
 }
 
 export async function gitPull(syncRepo: string): Promise<void> {
