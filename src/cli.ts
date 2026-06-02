@@ -19,7 +19,7 @@ const program = new Command();
 program
   .name("skill-sync")
   .description("Sync local AI agent skills with a Git-backed repository.")
-  .version("0.1.0");
+  .version("0.1.1");
 
 program
   .command("init")
@@ -223,8 +223,6 @@ function formatBranchSummary(status: { state: string; ahead: number; behind: num
 
   return "unknown";
 }
-
-program.exitOverride();
 
 try {
   await program.parseAsync(process.argv);

@@ -1,6 +1,6 @@
 {
   "name": "@nameczz/skill-sync",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first Web and CLI workbench for syncing AI agent skills through Git.",
   "type": "module",
   "packageManager": "yarn@1.22.22",
