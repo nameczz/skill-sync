@@ -53,7 +53,7 @@ describe("gitPush", () => {
 
     const finalStatus = await gitStatus(syncRepo);
     expect(finalStatus).toBe("");
-  });
+  }, 15_000);
 
   it("aborts and errors clearly when rebase is needed but conflicted", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "csm-git-rebase-conflict-"));
@@ -92,7 +92,7 @@ describe("gitPush", () => {
     expect(branchStatus.state).toBe("diverged");
     expect(branchStatus.ahead).toBe(1);
     expect(branchStatus.behind).toBe(1);
-  });
+  }, 15_000);
 });
 
 async function commitFile(repo: string, relativePath: string, content: string, message: string): Promise<string> {

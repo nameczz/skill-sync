@@ -1,5 +1,7 @@
 # Skill Sync
 
+[中文说明](./README.zh-CN.md)
+
 [![CI](https://img.shields.io/github/actions/workflow/status/nameczz/skill-sync/ci.yml?branch=main&label=CI)](./.github/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@nameczz/skill-sync?label=npm)](https://www.npmjs.com/package/@nameczz/skill-sync)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
@@ -9,17 +11,16 @@ A local-first web and CLI workbench for syncing AI agent skills across machines 
 
 Skills are just folders on your machine. That is great for hacking, but awkward once you have more than one computer, a growing skill library, or a mix of Codex and Agents skill directories. Skill Sync gives those folders a small control plane: choose what to track, keep local copies in sync, inspect conflicts, and push changes through your own Git repository.
 
-中文简介：Skill Sync 是一个本地优先的 skill 同步工具。你可以用自己的 Git 仓库在多台电脑之间同步 Codex / Agents skills，可视化查看本地/仓库差异、最近使用时间、Codex 归档会话，并支持自动同步。
-
 ## Screenshots
 
 These are placeholders. Replace them with real screenshots before sharing a launch post or article.
 
-| Skills dashboard | Conflict / compare flow |
-| --- | --- |
+| Skills dashboard                                                            | Conflict / compare flow                                                       |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | ![Skills dashboard placeholder](docs/screenshots/dashboard-placeholder.svg) | ![Conflict resolution placeholder](docs/screenshots/conflict-placeholder.svg) |
 
 Suggested real captures:
+
 - `docs/screenshots/skills-dashboard.png`
 - `docs/screenshots/codex-archive.png`
 - `docs/screenshots/compare-conflict.png`
@@ -87,6 +88,32 @@ skill-sync update-local <skill-id>
 skill-sync stop-syncing <skill-id>
 skill-sync serve --port 4100
 ```
+
+## Agent / Headless Usage
+
+For agents, `skill-sync serve` is the long-running sync process. It starts the local API server, the web UI, the auto-sync watcher, and the usage scanner.
+
+Initialize once with an explicit sync repository path:
+
+```bash
+skill-sync init --sync-repo /path/to/skills-sync
+```
+
+Then keep the watcher running:
+
+```bash
+skill-sync serve
+```
+
+Agents can edit tracked skills under `~/.codex/skills` or `~/.agents/skills`. Skill Sync detects local changes, copies them into the sync repo, commits, and pushes.
+
+Use machine-readable status when an agent needs to inspect state:
+
+```bash
+skill-sync status --json
+```
+
+If a conflict appears, do not overwrite silently. Resolve it through the Web UI or an explicit CLI/API action.
 
 ## Sync Model
 
