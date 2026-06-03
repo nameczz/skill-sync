@@ -170,6 +170,15 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const t = useMemo(() => makeT(locale), [locale]);
 
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setNotice(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
   const navigateView = useCallback((nextView: View, options: { replace?: boolean } = {}) => {
     setView(nextView);
 
@@ -1231,20 +1240,6 @@ export function App() {
           </div>
         </header>
 
-        {error ? (
-          <div className="notice error" role="alert">
-            <CircleAlert size={17} aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        ) : null}
-
-        {notice ? (
-          <div className="notice success" role="status">
-            <CheckCircle2 size={17} aria-hidden="true" />
-            <span>{notice}</span>
-          </div>
-        ) : null}
-
         {!configured && !loading ? (
           <section className="setup-panel" aria-labelledby="setup-title">
             <Card className="setup-copy">
@@ -1892,6 +1887,48 @@ export function App() {
         onResolve={() => void resolveRepoConflicts()}
       />
 
+      <SnackbarStack error={error} notice={notice} t={t} onDismissError={() => setError(null)} onDismissNotice={() => setNotice(null)} />
+    </div>
+  );
+}
+
+function SnackbarStack({
+  error,
+  notice,
+  t,
+  onDismissError,
+  onDismissNotice
+}: {
+  error: string | null;
+  notice: string | null;
+  t: TFunction;
+  onDismissError: () => void;
+  onDismissNotice: () => void;
+}) {
+  if (!error && !notice) {
+    return null;
+  }
+
+  return (
+    <div className="snackbar-stack" aria-live="polite" aria-atomic="true">
+      {error ? (
+        <div className="snackbar error" role="status">
+          <CircleAlert size={17} aria-hidden="true" />
+          <span>{error}</span>
+          <Button className="snackbar-close" variant="ghost" size="icon" type="button" onClick={onDismissError} aria-label={t("close")}>
+            <X size={15} aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
+      {notice ? (
+        <div className="snackbar success" role="status">
+          <CheckCircle2 size={17} aria-hidden="true" />
+          <span>{notice}</span>
+          <Button className="snackbar-close" variant="ghost" size="icon" type="button" onClick={onDismissNotice} aria-label={t("close")}>
+            <X size={15} aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

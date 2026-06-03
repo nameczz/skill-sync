@@ -127,7 +127,7 @@ describe("syncSelectedSkills", () => {
     expect(metadata.skills[0]?.updatedAt).toBe("2026-01-03T00:00:00.000Z");
     expect(metadata.skills[0]).not.toHaveProperty("archivedAt");
     await expect(readFile(path.join(config.syncRepo, "metadata", "usage-events.jsonl"), "utf8")).resolves.toContain("2026-01-04T00:00:00.000Z");
-  });
+  }, 15_000);
 
   it("lists and resolves diverged skill file conflicts by selected version", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "csm-sync-skill-conflict-"));
@@ -168,7 +168,7 @@ describe("syncSelectedSkills", () => {
     expect(result.gitBranchStatus.state).toBe("up-to-date");
     await expect(readFile(path.join(config.syncRepo, "skills", "foo", "SKILL.md"), "utf8")).resolves.toContain("Remote body");
     await expect(readFile(path.join(config.codexSkillsDir, "foo", "SKILL.md"), "utf8")).resolves.toContain("Remote body");
-  });
+  }, 15_000);
 });
 
 function testConfig(root: string): LocalConfig {

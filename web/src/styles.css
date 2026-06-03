@@ -662,28 +662,56 @@ textarea,
   min-width: 100%;
 }
 
-.notice {
+.snackbar-stack {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 70;
+  display: grid;
+  width: min(420px, calc(100vw - 48px));
+  gap: 10px;
+  pointer-events: none;
+}
+
+.snackbar {
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 40px;
-  margin-bottom: 14px;
-  padding: 10px 12px;
+  gap: 10px;
+  min-height: 46px;
+  padding: 11px 12px 11px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   font-size: 13px;
+  line-height: 1.35;
+  box-shadow: var(--shadow-dialog);
+  pointer-events: auto;
+  animation: snackbar-in 160ms ease-out;
 }
 
-.notice.error {
+.snackbar span {
+  min-width: 0;
+  flex: 1;
+}
+
+.snackbar.error {
   color: var(--risk-text);
   border-color: var(--risk-border);
   background: var(--risk-bg);
 }
 
-.notice.success {
+.snackbar.success {
   color: var(--good-text);
   border-color: var(--good-border);
   background: var(--good-bg);
+}
+
+.snackbar-close {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  flex: 0 0 auto;
+  color: currentColor;
 }
 
 .error-boundary {
@@ -2574,6 +2602,17 @@ textarea,
   }
 }
 
+@keyframes snackbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes drawer-in {
   from {
     opacity: 0.82;
@@ -2773,6 +2812,13 @@ textarea,
 @media (max-width: 560px) {
   .workspace {
     padding: 16px;
+  }
+
+  .snackbar-stack {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    width: auto;
   }
 
   .topbar-actions .button,
