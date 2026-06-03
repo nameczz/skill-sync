@@ -7,11 +7,26 @@
 - macOS for the native directory picker
 - A local folder or Git clone to use as the skill sync repository
 
+## Run Without Installing
+
+```bash
+npx @nameczz/skill-sync serve
+```
+
 ## Install from npm
 
 ```bash
 npm install -g @nameczz/skill-sync
 skill-sync serve
+```
+
+If `skill-sync` is not found after a global install, add your npm global binary directory to `PATH`:
+
+```bash
+npm config get prefix
+# Add <prefix>/bin to PATH. For example:
+echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 ## Run from Source

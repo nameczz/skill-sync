@@ -55,12 +55,33 @@ Prerequisites:
 - macOS for the native directory picker
 - A local folder or Git clone to use as the sync repository
 
-Install from npm:
+Run without installing:
+
+```bash
+npx @nameczz/skill-sync serve
+```
+
+Or install the CLI globally:
 
 ```bash
 npm install -g @nameczz/skill-sync
 skill-sync serve
 ```
+
+If `skill-sync` is not found after a global install, your npm global binary directory is not on `PATH`. Check the prefix:
+
+```bash
+npm config get prefix
+```
+
+Then add `<prefix>/bin` to your shell `PATH`. For example, if the prefix is `~/.npm-global`:
+
+```bash
+echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Already-open terminals need `source ~/.zshrc` or a restart before they can see the new command.
 
 Or run from source:
 

@@ -50,12 +50,33 @@ Codex / Agents skills 本质上就是本机文件夹。这很适合快速创建�
 - macOS 上支持原生目录选择器
 - 一个本地目录或 Git clone，用作 sync repo
 
-安装：
+不安装，直接运行：
+
+```bash
+npx @nameczz/skill-sync serve
+```
+
+或者全局安装 CLI：
 
 ```bash
 npm install -g @nameczz/skill-sync
 skill-sync serve
 ```
+
+如果全局安装后提示 `skill-sync: command not found`，说明 npm global binary 目录不在 `PATH` 里。先看 prefix：
+
+```bash
+npm config get prefix
+```
+
+然后把 `<prefix>/bin` 加到 shell `PATH`。比如 prefix 是 `~/.npm-global`：
+
+```bash
+echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+已经打开的 terminal 需要执行 `source ~/.zshrc`，或者重新开一个 terminal，才能识别新命令。
 
 打开：
 
