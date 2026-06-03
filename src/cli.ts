@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import { createLocalConfig, loadLocalConfig } from "./config.js";
 import { initialize } from "./init.js";
@@ -14,12 +15,13 @@ import { removeLocalSkill } from "./removeLocalSkill.js";
 import { stopSyncingSkill } from "./stopSyncingSkill.js";
 import { updateLocalSkill } from "./updateLocalSkill.js";
 
+const require = createRequire(import.meta.url);
 const program = new Command();
 
 program
   .name("skill-sync")
   .description("Sync local AI agent skills with a Git-backed repository.")
-  .version("0.1.1");
+  .version(readPackageVersion());
 
 program
   .command("init")
@@ -198,6 +200,22 @@ function resolveSourceOption(value: string | undefined): "codex" | "agents" | un
   }
 
   throw new Error(`Invalid source: ${value}. Use "codex" or "agents".`);
+}
+
+function readPackageVersion(): string {
+  const candidates = ["../package.json", "../../package.json"];
+  for (const candidate of candidates) {
+    try {
+      const packageJson = require(candidate) as { version?: unknown };
+      if (typeof packageJson.version === "string" && packageJson.version) {
+        return packageJson.version;
+      }
+    } catch {
+      // Try the next candidate. Source runs from src/, published CLI runs from dist/src/.
+    }
+  }
+
+  return "0.0.0";
 }
 
 function formatBranchSummary(status: { state: string; ahead: number; behind: number; upstream: string | null }): string {
