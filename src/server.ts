@@ -59,6 +59,7 @@ type SkillActionBody = {
 };
 
 type SkillFileBody = SkillActionBody & {
+  sources?: unknown;
   content?: unknown;
 };
 
@@ -372,14 +373,16 @@ export async function startServer(options: ServerOptions = {}): Promise<{ url: s
 
   app.put<{ Body: SkillFileBody }>("/api/skill-file", async (request) => {
     const loaded = requireConfig(config);
-    const filePath = localSkillMdPath(loaded, request.body);
-    if (!existsSync(filePath)) {
+    const filePaths = localSkillMdPaths(loaded, request.body);
+    const missingPath = filePaths.find((filePath) => !existsSync(filePath));
+    if (missingPath) {
       throw httpError(404, "Local SKILL.md not found.");
     }
 
-    await writeFile(filePath, requireSkillFileContent(request.body), "utf8");
+    const content = requireSkillFileContent(request.body);
+    await Promise.all(filePaths.map((filePath) => writeFile(filePath, content, "utf8")));
     autoSync.trigger();
-    return { path: filePath };
+    return { path: filePaths[0], paths: filePaths };
   });
 
   app.post<{ Body: SyncBody }>("/api/sync", async (request) => {
@@ -635,9 +638,33 @@ function requireLocalSource(value: unknown): LocalSkillSource {
   return source;
 }
 
+function optionalLocalSources(value: unknown): LocalSkillSource[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw httpError(400, "Request body sources must be an array.");
+  }
+
+  return [...new Set(value.map((source) => optionalLocalSource(source)).filter((source): source is LocalSkillSource => Boolean(source)))];
+}
+
+function localSkillMdPaths(config: LocalConfig, body: SkillFileBody | undefined): string[] {
+  const skillId = requireSkillId(body);
+  const sources = optionalLocalSources(body?.sources);
+  const selectedSources = sources.length > 0 ? sources : [requireLocalSource(body?.source)];
+
+  return selectedSources.map((source) => localSkillMdPathForSource(config, skillId, source));
+}
+
 function localSkillMdPath(config: LocalConfig, body: SkillActionBody | undefined): string {
   const skillId = requireSkillId(body);
   const source = requireLocalSource(body?.source);
+  return localSkillMdPathForSource(config, skillId, source);
+}
+
+function localSkillMdPathForSource(config: LocalConfig, skillId: string, source: LocalSkillSource): string {
   const localRoot = source === "agents" ? config.agentsSkillsDir : config.codexSkillsDir;
 
   try {

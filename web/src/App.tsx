@@ -910,15 +910,16 @@ export function App() {
       const response = await fetch("/api/skill-file", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skillId: row.id, source: editorState.source, content: editorState.content })
+        body: JSON.stringify({ skillId: row.id, source: editorState.source, sources: row.localSources, content: editorState.content })
       });
       if (!response.ok) {
         throw new Error(await readError(response));
       }
 
-      setEditorState((current) => (current?.rowKey === key ? { ...current, dirty: false } : current));
+      setEditorState(null);
       await refresh({ silent: true });
       setSelectedRowKey(key);
+      setNotice(t("localSkillMdSaved"));
     } catch (err) {
       setError(errorMessage(err, t("unableToSaveSkillMd"), t));
     } finally {

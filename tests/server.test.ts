@@ -265,6 +265,24 @@ describe("server", () => {
 
       expect(writeResponse.ok).toBe(true);
       expect(await readFile(skillFile, "utf8")).toBe(updated);
+
+      const codexSkillDir = path.join(config.codexSkillsDir, "klay-writer");
+      const codexSkillFile = path.join(codexSkillDir, "SKILL.md");
+      await mkdir(codexSkillDir, { recursive: true });
+      await writeFile(codexSkillFile, original, "utf8");
+
+      const syncedLocalCopies = "---\nname: Klay Writer\n---\nSynced local copy body\n";
+      const multiWriteResponse = await fetch(`${server.url}/api/skill-file`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skillId: "klay-writer", source: "agents", sources: ["codex", "agents"], content: syncedLocalCopies })
+      });
+      const multiWritePayload = (await multiWriteResponse.json()) as { paths: string[] };
+
+      expect(multiWriteResponse.ok).toBe(true);
+      expect(multiWritePayload.paths.sort()).toEqual([codexSkillFile, skillFile].sort());
+      expect(await readFile(skillFile, "utf8")).toBe(syncedLocalCopies);
+      expect(await readFile(codexSkillFile, "utf8")).toBe(syncedLocalCopies);
     } finally {
       await server.close();
     }
