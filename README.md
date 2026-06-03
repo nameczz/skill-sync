@@ -7,24 +7,23 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933)](https://nodejs.org/)
 
-Skill Sync is a local-first tool for syncing Codex skills across computers through your own Git repository. It also shows when each skill was last used, making it easier to prune skills you no longer need, and includes a Codex Archive manager for archived sessions.
+Skill Sync is a local-first manager and sync tool for Codex skills. It helps you keep your installed or authored skills in your own Git repository, sync them across computers, and manage them from a Web UI or CLI.
 
-Skills are local folders. That is great for creating and editing them quickly, but awkward once you use Codex on multiple machines or maintain a growing skill library. Skill Sync gives those folders a small local control plane: choose what to track, sync through Git, monitor usage, resolve conflicts, and manage archived Codex sessions. It currently supports Codex `~/.codex/skills` and Agents `~/.agents/skills`, with room for more runtimes later.
+Codex / Agent skills are just local files — they don't sync across machines.
+Edit a skill on your work laptop, and it won't show up on your home machine.
+Modify both sides, and merging by hand risks overwriting the wrong version.
+Over time, skills also accumulate silently: you forget which ones you actually use,
+and have no real basis for deciding what to delete.
 
-## Screenshots
+Skill Sync solves this by turning your own Git repository into the source of truth.
+You choose which skills to track; the tool syncs them across machines and surfaces
+version conflicts so you can compare and decide what to keep.
 
-These are placeholders. Replace them with real screenshots before sharing a launch post or article.
+It also runs a lightweight local service that scans Codex session traces to record
+when each skill was last used by an agent — giving you real usage data to guide cleanup.
 
-| Skills dashboard                                                            | Conflict / compare flow                                                       |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| ![Skills dashboard placeholder](docs/screenshots/dashboard-placeholder.svg) | ![Conflict resolution placeholder](docs/screenshots/conflict-placeholder.svg) |
-
-Suggested real captures:
-
-- `docs/screenshots/skills-dashboard.png`
-- `docs/screenshots/codex-archive.png`
-- `docs/screenshots/compare-conflict.png`
-- `docs/screenshots/dark-mode.png`
+Everything is local-first: no hosted backend, no central server.
+Your skills only travel through your own Git remote.
 
 ## Features
 
@@ -88,6 +87,14 @@ On first launch:
 2. Initialize the manager.
 3. Add local-only skills to sync.
 4. Let auto-sync watch managed skills, or use manual actions when you want explicit control.
+
+The Web UI is the primary control surface for tracking skills, applying repo changes, and reviewing local state.
+
+![Skills dashboard](docs/screenshots/skills-dashboard.png)
+
+When local and repo versions diverge, open the compare dialog and choose which version to keep.
+
+![Conflict compare dialog](docs/screenshots/compare-conflict.png)
 
 ### CLI
 
@@ -262,7 +269,7 @@ skill-sync/
 ├── src/                # CLI, sync, git, archive, usage scanner, server
 ├── web/                # local management UI
 ├── tests/              # Vitest coverage
-├── docs/               # docs and screenshot placeholders
+├── docs/               # docs and README screenshots
 ├── .github/            # CI workflows and GitHub metadata
 └── README.md
 ```

@@ -1,15 +1,6 @@
-# Screenshot Slots
+# Screenshots
 
-Replace the current SVG placeholders with real screenshots before publishing a launch post or article.
+Screenshots used by the README files.
 
-Recommended captures:
-
-- `skills-dashboard.png` — main Skills dashboard, preferably with a few different states visible.
-- `codex-archive.png` — Codex Archive list and drawer.
+- `skills-dashboard.png` — main Web UI dashboard.
 - `compare-conflict.png` — compare / conflict resolution dialog.
-- `dark-mode.png` — dark mode overview.
-
-Current placeholders:
-
-- `dashboard-placeholder.svg`
-- `conflict-placeholder.svg`

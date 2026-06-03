@@ -2,24 +2,19 @@
 
 [English](./README.md)
 
-Skill Sync 是一个本地优先的 skill 同步工具，主要用来把 Codex skills 通过你自己的 Git 仓库同步到不同电脑上。它也会显示每个 skill 上次被使用的时间，方便你清理不再需要的 skill；同时支持管理 Codex App 的 archived sessions。
+Skill Sync 是一个本地优先的 Codex skill 管理和同步工具。它把你安装或自己创建的 skills 放进你自己的 Git 同步仓库里，让不同电脑上的 Codex 可以共享同一套 skills，并通过 Web UI 或 CLI 管理它们。
 
-Skills 本质上就是本机文件夹。这很适合快速创建和修改，但当你在多台电脑上使用 Codex、skills 越来越多，或者同时使用 `~/.codex/skills` 和 `~/.agents/skills` 时，就需要一个小型控制台来管理它们。Skill Sync 用 Git 做同步源，提供 Web UI 和 CLI，帮助你选择要跟踪的 skill、查看本地/仓库差异、处理冲突、自动 commit/push，并了解哪些 skill 很久没用过。
+Codex / Agent 的 skills 本质上只是本地文件——不会在多台机器之间自动同步。
+在公司电脑上改了某个 skill，回家后不会出现在笔记本上；两边同时改过，手动合并很容易覆盖错版本。
+时间久了，skills 还会默默积累：你不记得哪些还在用，想清理也没有依据。
 
-## 截图
+Skill Sync 的做法是以你自己的 Git 仓库为同步源。
+你选择要跟踪哪些 skills，工具负责跨机器同步，并在版本冲突时让你逐一对比、决定保留哪个。
 
-这里先保留截图位置。发布文章或分享前，把真实截图放到 `docs/screenshots/`。
+它同时会在本地运行一个轻量服务，扫描 Codex session traces，记录每个 skill 最近被 agent 使用的时间——
+这样清理时就有了真实的使用数据作依据。
 
-| Skills 主面板 | 冲突 / 版本比较 |
-| --- | --- |
-| ![Skills dashboard placeholder](docs/screenshots/dashboard-placeholder.svg) | ![Conflict resolution placeholder](docs/screenshots/conflict-placeholder.svg) |
-
-推荐截图文件名：
-
-- `docs/screenshots/skills-dashboard.png`
-- `docs/screenshots/codex-archive.png`
-- `docs/screenshots/compare-conflict.png`
-- `docs/screenshots/dark-mode.png`
+整个工具保持本地优先：没有托管后端，没有中心化服务，skills 只通过你自己的 Git remote 同步。
 
 ## 功能
 
@@ -29,9 +24,6 @@ Skills 本质上就是本机文件夹。这很适合快速创建和修改，但�
 - [x] 使用时间监控：从本地 Codex session traces 里提取 last used，帮助你发现长期没用的 skill。
 - [x] Codex Archive 管理：查看 archived sessions，支持预览、移入 Trash、恢复、取消归档。
 - [x] 本地优先：不提供 SaaS，不需要中心化后端，本机配置和 cache 不进入 Git。
-
-## 未来可能做
-
 - [ ] Claude 到 Claude 的 skill 同步。
 - [ ] Claude 和 Codex 之间的 skill 同步 / 迁移。
 - [ ] Skill 优化检查和建议，比如 description 是否容易命中、内容是否太长、结构是否清晰。
@@ -41,9 +33,7 @@ Skills 本质上就是本机文件夹。这很适合快速创建和修改，但�
 前置要求：
 
 - Node.js `>=20`
-- Git
-- macOS 上支持原生目录选择器
-- 一个本地目录或 Git clone，用作 sync repo
+- Git repo
 
 ### Web UI
 
@@ -87,6 +77,14 @@ http://127.0.0.1:3017
 2. 初始化 Skill Sync。
 3. 把本机 `Local only` skills 添加到同步。
 4. 后续由 auto-sync 自动监听已跟踪 skill 的变化，也可以手动执行操作。
+
+Web UI 是主要管理入口，用来选择要跟踪的 skills、应用仓库更新、查看本地状态。
+
+![Skills 主面板](docs/screenshots/skills-dashboard.png)
+
+当本地和仓库版本不一致时，可以打开比较弹窗，选择保留哪个版本。
+
+![冲突版本比较](docs/screenshots/compare-conflict.png)
 
 ### CLI
 
