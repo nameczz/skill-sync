@@ -856,12 +856,12 @@ export function App() {
       return;
     }
 
-    if (row.localSources.length > 1) {
+    if (row.localSources.length > 1 && row.localCopiesDiffer) {
       setPendingEditRow(row);
       return;
     }
 
-    const source = row.localSources[0];
+    const source = preferredEditorSource(row);
     if (source) {
       void openSkillEditor(row, source);
     }
@@ -2119,6 +2119,11 @@ function canRemoveLocal(row: SkillRow) {
 
 function localSourcesForRow(row: SkillRow): LocalSkillSource[] {
   return [...row.localSources] as LocalSkillSource[];
+}
+
+function preferredEditorSource(row: SkillRow): LocalSkillSource | undefined {
+  const sources = localSourcesForRow(row);
+  return sources.includes("codex") ? "codex" : sources[0];
 }
 
 function skillActionBody(row: SkillRow): { skillId: string; source?: LocalSkillSource } {
