@@ -7,9 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933)](https://nodejs.org/)
 
-A local-first web and CLI workbench for syncing AI agent skills across machines with Git. It currently supports Codex and Agents skill folders, with room for more runtimes later.
+Skill Sync is a local-first tool for syncing Codex skills across computers through your own Git repository. It also shows when each skill was last used, making it easier to prune skills you no longer need, and includes a Codex Archive manager for archived sessions.
 
-Skills are just folders on your machine. That is great for hacking, but awkward once you have more than one computer, a growing skill library, or a mix of Codex and Agents skill directories. Skill Sync gives those folders a small control plane: choose what to track, keep local copies in sync, inspect conflicts, and push changes through your own Git repository.
+Skills are local folders. That is great for creating and editing them quickly, but awkward once you use Codex on multiple machines or maintain a growing skill library. Skill Sync gives those folders a small local control plane: choose what to track, sync through Git, monitor usage, resolve conflicts, and manage archived Codex sessions. It currently supports Codex `~/.codex/skills` and Agents `~/.agents/skills`, with room for more runtimes later.
 
 ## Screenshots
 
@@ -26,27 +26,22 @@ Suggested real captures:
 - `docs/screenshots/compare-conflict.png`
 - `docs/screenshots/dark-mode.png`
 
-## What It Does
+## Features
 
-- Tracks selected skills from `~/.codex/skills` and `~/.agents/skills`.
-- Syncs skill folders through a Git repository that you control.
-- Supports one-click add, install, update, stop syncing, and local delete flows.
-- Auto-syncs managed local skill changes and commits/pushes them to the sync repo.
-- Pulls remote changes from another machine and applies missing or updated skills locally.
-- Shows skill states such as in sync, local only, repo only, local changed, repo changed, and conflict.
-- Lets you compare versions and choose which copy should win when a skill conflicts.
-- Records skill usage from local Codex session traces and shows last-used time.
-- Includes a Codex Archive browser for archived sessions, with soft delete, restore, and unarchive.
-- Keeps machine-specific config and cache out of Git.
+- [x] Sync selected Codex and Agents skills across computers with your own Git repository.
+- [x] Web UI for choosing tracked skills, reviewing local/repo state, resolving conflicts, and applying remote updates.
+- [x] Auto-sync watcher that commits and pushes edits to tracked local skills.
+- [x] Last-used monitoring from local Codex session traces so stale skills are easier to find and delete.
+- [x] Codex Archive session management, including preview, Trash, restore, and unarchive.
+- [x] Local-first storage: no hosted service, no central backend, and machine-specific config/cache stay out of Git.
 
-## What It Does Not Do
+## Future
 
-- It does not host your skills on a SaaS service.
-- It does not require a central backend beyond your own Git remote.
-- It does not delete local installed skill copies when you stop syncing a skill.
-- It does not change how Codex loads skills; Codex still reads local skill directories.
+- [ ] Claude-to-Claude skill sync.
+- [ ] Claude and Codex skill sync/migration.
+- [ ] Skill quality checks and optimization suggestions, such as description clarity, length, discoverability, and structure.
 
-## Quick Start
+## Usage
 
 Prerequisites:
 
@@ -54,6 +49,8 @@ Prerequisites:
 - Git
 - macOS for the native directory picker
 - A local folder or Git clone to use as the sync repository
+
+### Web UI
 
 Run without installing:
 
@@ -83,13 +80,6 @@ source ~/.zshrc
 
 Already-open terminals need `source ~/.zshrc` or a restart before they can see the new command.
 
-Or run from source:
-
-```bash
-yarn install
-npm run dev -- serve
-```
-
 Open [http://127.0.0.1:3017](http://127.0.0.1:3017).
 
 On first launch:
@@ -99,20 +89,9 @@ On first launch:
 3. Add local-only skills to sync.
 4. Let auto-sync watch managed skills, or use manual actions when you want explicit control.
 
-## Common CLI Commands
+### CLI
 
-```bash
-skill-sync status
-skill-sync pull
-skill-sync sync <skill-id>
-skill-sync update-local <skill-id>
-skill-sync stop-syncing <skill-id>
-skill-sync serve --port 4100
-```
-
-## Agent / Headless Usage
-
-For agents, `skill-sync serve` is the long-running sync process. It starts the local API server, the web UI, the auto-sync watcher, and the usage scanner.
+Use the CLI for headless or agent-driven workflows. `skill-sync serve` starts the local API server, Web UI, auto-sync watcher, and usage scanner.
 
 Initialize once with an explicit sync repository path:
 
@@ -126,15 +105,28 @@ Then keep the watcher running:
 skill-sync serve
 ```
 
-Agents can edit tracked skills under `~/.codex/skills` or `~/.agents/skills`. Skill Sync detects local changes, copies them into the sync repo, commits, and pushes.
-
-Use machine-readable status when an agent needs to inspect state:
+Common commands:
 
 ```bash
+skill-sync status
 skill-sync status --json
+skill-sync pull
+skill-sync sync <skill-id>
+skill-sync update-local <skill-id>
+skill-sync stop-syncing <skill-id>
+skill-sync serve --port 4100
 ```
 
+Agents can edit tracked skills under `~/.codex/skills` or `~/.agents/skills`. Skill Sync detects local changes, copies them into the sync repo, commits, and pushes.
+
 If a conflict appears, do not overwrite silently. Resolve it through the Web UI or an explicit CLI/API action.
+
+### Run from Source
+
+```bash
+yarn install
+npm run dev -- serve
+```
 
 ## Sync Model
 
